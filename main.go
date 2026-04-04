@@ -38,16 +38,16 @@ func main() {
 	// Grammatical Evolution (GE) - Execute the evolution algorithm over a 
 	// given number of generations.
 	//
-	// 	 - GenerationalReplacement: Replaces older individuals with newer 
-	// 	   ones, preserving elites.
-	// 	 - TournamentSelection: Selects individuals for breeding via a 
-	// 	   tournament.
+	// - GenerationalReplacement: Replaces older individuals with newer 
+	//   ones, preserving elites.
+	// - TournamentSelection: Selects individuals for breeding via a 
+	//   tournament.
 	//
 	bestEver, err := SearchLoop(
-		GENERATIONS, 		// Total number of generations
-		POPULATION_SIZE,	// Population size
-		grammar,			// Grammar used to generate individuals
-		target,				// Target to be reached
+		GENERATIONS,        // Total number of generations
+		POPULATION_SIZE,    // Population size
+		grammar,            // Grammar used to generate individuals
+		target,	            // Target to be reached
 		func(newIndividuals, oldIndividuals []*Individual, eliteSize int) []*Individual { 
 			return GenerationalReplacement(newIndividuals, oldIndividuals, eliteSize) 
 		},
