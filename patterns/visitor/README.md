@@ -6,6 +6,7 @@ modifying their structure. This pattern is particularly useful for:
 - Traversing and transforming complex structures (trees, graphs);
 - Adding functionality dynamically without modifying existing classes;
 - Decouple algorithms from the data structures on which they operate.
+
 This package implements the pattern in Go with generics, ensuring type safety 
 and flexibility.
 
@@ -14,8 +15,7 @@ and flexibility.
  |-------------------|---------------------------------------------------------|
  | `IVisitable[T, U]`| Interface for "visitable" objects.                      |
  | `IVisitor`        | Interface for "visitor" objects.                        |
- | `IVisited[T]`     | Extendable and adaptable to support chaining operations |
- |                   | or lazy evaluation.                                     |
+ | `IVisited[T]`     | Extendable and adaptable to support chaining operations or lazy evaluation.                                     |
  | `VisitedModel`    | Concrete implementation of a visitable object.          |
  | `ModelVisitor`    | Concrete implementation of a visitor, using a fonction. |
 
@@ -35,7 +35,7 @@ visited.Accept(visitor)
 ```go
 visited := (&VisitedModel{}).Create()
 ```
-### 3. Accepter le visiteur
+### 3. Accept the visitor
 ```go
 visited.Accept(visitor)
 ```

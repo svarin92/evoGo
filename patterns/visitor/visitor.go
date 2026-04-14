@@ -8,6 +8,7 @@
 // - IVisitable: Defines the contract for objects that can be visited.
 // - IVisitor: Defines the contract for visitor objects.
 // - IVisited: Extends IVisitable to support chaining and lazy evaluation.
+// - VisitedModel: Concrete implementation of a visitable object.
 // - ModelVisitor: A concrete visitor implementation using function 
 //   composition.
 package visitor
