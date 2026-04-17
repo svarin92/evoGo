@@ -24,7 +24,7 @@ evolutionary grammars.
 - **`SequenceModel`** represents a **syntagm** (or codon): a sequence of EBNF rules 
   that can evolve within the **Genomizer** framework.
 
-### 2. Initialisation tardive 
+### 2. Late initialization 
 Fields like `lexeme` or `Symbols` are populated **during serialization**, via 
 methods like `Serializer.DoHandle*`. This allows for flexible and decoupled 
 model construction.
