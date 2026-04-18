@@ -250,7 +250,7 @@ func (rb *RuleBuilder) IsValidTermGroup(termGroup []*RuleModel) bool {
 
     for _, rule := range termGroup {
     
-		if rule == nil || !rule.IsValid() {  // Vérifie aussi la validité de chaque règle
+		if rule == nil || !rule.IsValid() {  // Also check the validity of each rule
             return false
         }
     

@@ -20,7 +20,7 @@ Within the **evoGo** project, the Builder plays a key role in:
 | `IBuilder`        | Interface defining the methods for building EBNF rule models.               |
 | `RuleBuilder`     | Concrete implementation of the Builder. Handles term groups and constructs. |
 
-## Fonctionnalités Principales
+## Main Features
 
 ### 1. Model Building
 The Builder allows you to construct different types of EBNF models:
@@ -41,7 +41,7 @@ Each constructed model can be validated via the `IsValid()` method (e.g.,
 checking for non-empty groups and valid rules).
 
 ## Example of Use
-### 1. Création d'un Builder
+### 1. Creating a Builder
 ```go
 // Create a new RuleBuilder instance.
 builder := NewBuilder()
