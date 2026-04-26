@@ -106,7 +106,7 @@ factorizedRule := optimizations.LeftFactorize(rule, rules)
 // Résult: A → aA_tail, A_tail → b | c
 ```
 
-## **Borderline cases and best practices**
+## **Edge cases and best practices**
 
 ### 1. Managing circular dependencies
 Use IndirectLeftRecurse to detect and resolve circular dependencies between non-terminals.
