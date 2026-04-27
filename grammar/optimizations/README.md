@@ -26,7 +26,7 @@ Add this package to your Go project by importing the appropriate path:
 import "evoGo/grammar/optimizations"
 ```
 
-## **Utilisation**
+## **Usage**
 
 ### 1. Simplifying repetitions
 Replace non-terminals with their productions and remove duplicates.
@@ -72,7 +72,7 @@ expanded := optimizations.ExpandRepetition(repetition, rhs, rules)
 // Result: Develops repetition according to EBNF semantics.
 ```
 
-## **Exemples concrets**
+## **Examples**
 
 ### Exemple 1 : Simplification
 ```go
@@ -106,7 +106,7 @@ factorizedRule := optimizations.LeftFactorize(rule, rules)
 // Résult: A → aA_tail, A_tail → b | c
 ```
 
-## **Borderline cases and best practices**
+## **Edge cases and best practices**
 
 ### 1. Managing circular dependencies
 Use IndirectLeftRecurse to detect and resolve circular dependencies between non-terminals.
@@ -138,19 +138,20 @@ func TestSimplifyRepetition(t *testing.T) {
     if len(simplified) != 3 {
         t.Errorf("Expected 3 productions, got %d", len(simplified))
     }
+
 }
 ```
 
 ## **Architecture and integration**
 
 ### 1. Integration with Genomizer
-This package is designed for use with the Genomizer, where grammars are dynamically modified by evolutionary mechanisms.
+This package is designed for use with the Genomizer project, where grammars are dynamically modified by evolutionary mechanisms.
 
-### 2. Addictions
-* evoGo/model: Provides the data structures for rules and symbols.
-* golang.org/x/exp/slices: Used for operations on slices.
+### 2. Dependencies
+* evoGo/model: Provides data structures for rules and symbols.
+* golang.org/x/exp/slices: Used for slice operations.
 
-## **Contribuer**
+## **Contributing**
 
 ### 1. Report a bug
 Open an issue on the GitHub repository with a clear description of the problem.
