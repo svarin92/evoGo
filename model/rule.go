@@ -188,6 +188,10 @@ func (rm *RuleModel) GetIdentifier() string {
 	return rm.Production.Production
 }
 
+func (rm *RuleModel) GetSymbols() [][]IRuleModel {
+    return rm.rhs
+}
+
 // GetSymbolType implements interfaces.IRuleModel.GetSymbolType.
 func (rm *RuleModel) GetSymbolType() SymbolType {
     return rm.SymbolType
@@ -205,6 +209,10 @@ func (rm *RuleModel) IsValid() bool {
 	}
 
 	return rm.Symbol != "" && (rm.SymbolType == 0 || rm.SymbolType == 1)
+}
+
+func (rm *RuleModel) SetSymbols(symbols [][]IRuleModel) {
+    rm.rhs = symbols
 }
 
 func (rm *RuleModel) String() string {
@@ -286,4 +294,16 @@ func (sm *SequenceModel) IsValid() bool {
 	}
 
 	return true
+}
+
+/* Exports */
+
+// NewRuleModel creates a new RuleModel instance. Function exported to allow 
+// creation from other packages.
+func NewRuleModel(symbol string, symbolType SymbolType, rhs [][]IRuleModel) IRuleModel {
+    return &RuleModel{
+        Symbol:     symbol,
+        SymbolType: symbolType,
+        rhs:        rhs,  // the private rhs field is exported
+    }
 }
