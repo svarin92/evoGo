@@ -46,6 +46,11 @@ func (im *IdentifierModel) GetLexeme() IRuleModel {
 	return im.TermModel.GetLexeme()
 }
 
+func (im *IdentifierModel) InitializeLexeme() {
+    im.lexeme.Symbol = im.GetIdentifier()
+    im.lexeme.SymbolType = NonTerminal
+}
+
 // Delegate to the lexemeAn identifier is valid if its lexeme is valid and 
 // its name is not empty.
 func (im *IdentifierModel) IsValid() bool {
@@ -151,7 +156,7 @@ func (tm *TermModel) DoAccept(visitor IVisitor) {
 
 // GetLexeme returns the lexeme of the term.
 func (tm *TermModel) GetLexeme() IRuleModel {
-	return tm.lexeme
+	return tm.lexeme  // Implicit cast from *RuleModel to IRuleModel
 }
 
 // GetText implements interfaces.TextProvider.GetText.
@@ -173,4 +178,9 @@ func (tm *TermModel) IsValid() bool {
     }
     
 	return tm.lexeme.IsValid()
+}
+
+// SetLexeme defines the lexeme of the term.
+func (tm *TermModel) SetLexeme(lexeme IRuleModel) {
+    tm.lexeme = lexeme.(*RuleModel)  // Explicit cast to concrete type
 }
