@@ -1,3 +1,7 @@
+// Copyright 2026 Stéphane Varin. All rights reserved.
+// Use of this source code is governed by the MIT license.
+// See the LICENSE file for details.
+//
 // Package pattern implements the Notifier pattern, which extends the Visitor
 // pattern to support notification mechanisms after a visit operation.
 //

@@ -1,3 +1,7 @@
+// Copyright 2026 Stéphane Varin. All rights reserved.
+// Use of this source code is governed by the MIT license.
+// See the LICENSE file for details.
+//
 // The algo package provides a factory for creating specialized parsing 
 // algorithms for EBNF (Extended Backus-Naur Form) models. This package 
 // extends the Visitor pattern to offer configurable and reusable algorithms 

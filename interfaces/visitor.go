@@ -1,3 +1,7 @@
+// Copyright 2026 Stéphane Varin. All rights reserved.
+// Use of this source code is governed by the MIT license.
+// See the LICENSE file for details.
+//
 // Package interfaces define the base interfaces for the patterns used in 
 // evoGo. These interfaces are designed to be stable and independent of 
 // specific implementations. They allow for complete decoupling between 

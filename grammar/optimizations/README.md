@@ -165,7 +165,7 @@ Open an issue on the GitHub repository with a clear description of the problem.
 This project is distributed under the [MIT](https://opensource.org/licenses/MIT).
 © Stéphane Varin, 2026.
 
-## **Thanks**
+## **Acknowledgments**
 * Thanks to the Go community for the open-source tools and libraries.
 * Inspiration drawn from work on evolutionary grammars and factorization algorithms.
 

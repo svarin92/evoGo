@@ -1,15 +1,9 @@
 # Package `model`
 
 ## Description
-The `model` package provides the **data structures** and **domain models** to 
-represent EBNF (Extended Backus-Naur Form) rules and expressions. These models 
-are designed for use with the **Visitor**, **Builder**, and **Notifier** 
-patterns, and are initialized **late** by the `Serializer` during serialization.
+The `model` package provides the **data structures** and **domain models** to represent EBNF (Extended Backus-Naur Form) rules and expressions. These models are designed for use with the **Visitor**, **Builder**, and **Notifier** patterns, and are initialized **late** by the `Serializer` during serialization.
 
-This package plays a central role in **evoGo**, particularly for the **Genomizer**, 
-where **EBNF sequences** (like `SequenceModel`) are treated as **codons**: basic
-units for building and evolving grammars. These codons can be manipulated, 
-recombined, or mutated to simulate **natural selection** within the framework of 
+This package plays a central role in **evoGo**, particularly for the **Genomizer**, where **EBNF sequences** (like `SequenceModel`) are treated as **codons**: basic units for building and evolving grammars. These codons can be manipulated, recombined, or mutated to simulate **natural selection** within the framework of 
 evolutionary grammars.
 
 ## Key Features
@@ -19,21 +13,19 @@ evolutionary grammars.
   - `LiteralModel` : Represents a literal (ex: "abc"`).
   - `IdentifierModel` : Represents an identifier (e.g., `letter`).
   - `SubExpressionModel` : Represents a sub-expression (e.g., `(a b)`).
-- **`NotifiedModel`** is inherited by all models to support the **Notifier Pattern**
+- **`NotifiedModel`** is inherited by all models to support the **Notifier Pattern** 
   (post-visit notifications).
 - **`SequenceModel`** represents a **syntagm** (or codon): a sequence of EBNF rules 
   that can evolve within the **Genomizer** framework.
 
 ### 2. Late initialization 
-Fields like `lexeme` or `Symbols` are populated **during serialization**, via 
-methods like `Serializer.DoHandle*`. This allows for flexible and decoupled 
-model construction.
+Fields like `lexeme` or `Symbols` are populated **during serialization**, via methods like `Serializer.DoHandle*`. This allows for flexible and decoupled model construction.
 
 ### 3. Pattern Integration
 - **Visitor Pattern**: Each model implements DoAccept(visitor IVisitor) to allow 
-traversal, validation, or transformation operations.
+  traversal, validation, or transformation operations.
 - **Notifier Pattern**: Thanks to the inheritance from NotifiedModel, models can 
-trigger notifications after a visit.
+  trigger notifications after a visit.
 
 ### 4. Validation
 Each model exposes an IsValid() method to check its validity. This includes:
@@ -90,5 +82,5 @@ notifiedRule.Accept(visitor, func() {
 ```
 
 ## License
-This project is distributed under the [MIT](LICENSE).
+This project is distributed under the [MIT](https://opensource.org/licenses/MIT).
 © Stéphane Varin, 2026.

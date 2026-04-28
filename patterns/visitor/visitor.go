@@ -1,3 +1,7 @@
+// Copyright 2026 Stéphane Varin. All rights reserved.
+// Use of this source code is governed by the MIT license.
+// See the LICENSE file for details.
+//
 // Package pattern implements the Visitor design pattern in Go using generics.
 //
 // The Visitor pattern allows for adding new operations to existing object 

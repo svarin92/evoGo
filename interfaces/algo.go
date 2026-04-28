@@ -1,3 +1,7 @@
+// Copyright 2026 Stéphane Varin. All rights reserved.
+// Use of this source code is governed by the MIT license.
+// See the LICENSE file for details.
+//
 // Package interfaces defines the specialized interfaces for EBNF parsing 
 // algorithms. These interfaces extend IVisitor to allow specialization by 
 // model type.
