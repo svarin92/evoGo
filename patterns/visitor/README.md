@@ -1,14 +1,12 @@
 # Visitor Pattern
 
 ## Description
-The Visitor Pattern allows you to add new operations to objects without 
-modifying their structure. This pattern is particularly useful for:
+The Visitor Pattern allows you to add new operations to objects without modifying their structure. This pattern is particularly useful for:
 - Traversing and transforming complex structures (trees, graphs);
 - Adding functionality dynamically without modifying existing classes;
 - Decouple algorithms from the data structures on which they operate.
 
-This package implements the pattern in Go with generics, ensuring type safety 
-and flexibility.
+This package implements the pattern in Go with generics, ensuring type safety and flexibility.
 
 ## Key Components
    Component         | Role                                                    |
@@ -54,3 +52,7 @@ visited.Accept(
   updates).
 - Builder: Can be combined with the Builder to validate rules during object 
   construction.
+
+## **Licence**
+This project is distributed under the [MIT](https://opensource.org/licenses/MIT).
+© Stéphane Varin, 2026.

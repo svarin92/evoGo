@@ -1,10 +1,7 @@
 # Builder Pattern
 
 ## Description
-The **Builder Pattern** allows you to build **EBNF** rule models from an **AST** 
-(Abstract Syntax Tree). This pattern is designed to be used with **Visitor** and 
-**Notifier Patterns**, to enable transformations, validations, or notifications 
-during rule construction.
+The **Builder Pattern** allows you to build **EBNF** rule models from an **AST** (Abstract Syntax Tree). This pattern is designed to be used with **Visitor** and **Notifier Patterns**, to enable transformations, validations, or notifications during rule construction.
 
 Within the **evoGo** project, the Builder plays a key role in:
 - **Building evolving grammars** by assembling rules, expressions, and sequences
@@ -37,8 +34,7 @@ The Builder offers two methods for modifying term groups:
   and filtering of invalid groups).
 
 ### 3. Validation
-Each constructed model can be validated via the `IsValid()` method (e.g., 
-checking for non-empty groups and valid rules).
+Each constructed model can be validated via the `IsValid()` method (e.g., checking for non-empty groups and valid rules).
 
 ## Example of Use
 ### 1. Creating a Builder

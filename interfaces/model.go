@@ -56,8 +56,10 @@ type IRuleModel interface {
     ITextProvider
 	INotifiedModel
 	GetIdentifier() string
+	GetSymbols() [][]IRuleModel  // Returns the symbols (abstraction of rhs)
 	GetSymbolType() SymbolType 
     IsValid() bool
+	SetSymbols(symbols [][]IRuleModel)
 }
 
 // ISequenceModel defines the methods for EBNF sequences. In evoGo, a sequence

@@ -1,14 +1,9 @@
 # Package Algo
 
 ## Description
-The `algo` package provides an **algorithm factory** for creating visitors 
-specialized in parsing EBNF models. It extends the **Visitor Pattern** to 
-offer configurable and reusable algorithms for traversing, validating, or 
-transforming EBNF rule structures.
+The `algo` package provides an **algorithm factory** for creating visitors specialized in parsing EBNF models. It extends the **Visitor Pattern** to offer configurable and reusable algorithms for traversing, validating, or transforming EBNF rule structures.
 
-This package is designed to be used with the models defined in the `model` 
-package (e.g., `RuleModel`, `ExpressionModel`) and can be integrated with 
-other patterns like **Builder** or **Notifier** for advanced processing.
+This package is designed to be used with the models defined in the `model` package (e.g., `RuleModel`, `ExpressionModel`) and can be integrated with other patterns like **Builder** or **Notifier** for advanced processing.
 
 ## Key Components
    Component               | Role                                              |
@@ -151,3 +146,7 @@ func main() {
     })
 }
 ```
+
+## **Licence**
+This project is distributed under the [MIT](https://opensource.org/licenses/MIT). 
+© Stéphane Varin, 2026.
