@@ -74,7 +74,7 @@ expanded := optimizations.ExpandRepetition(repetition, rhs, rules)
 
 ## **Examples**
 
-### Exemple 1 : Simplification
+### Example 1: Simplification
 ```go
 // Grammar: X → a | b
 rules := map[string]model.IRuleModel{
@@ -93,7 +93,7 @@ simplified := optimizations.SimplifyRepetition(rhs, rules)
 // Résult : [[a, c], [b, c]]
 ```
 
-### Exemple 2 : Factorization
+### Example 2: Factorization
 ```go
 // Initial rule: A → ab | ac
 rule := model.NewRuleModel("A", model.NonTerminal, [][]model.IRuleModel{
