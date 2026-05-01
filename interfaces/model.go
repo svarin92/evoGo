@@ -55,6 +55,7 @@ type ILiteralModel interface {
 type IRuleModel interface {
     ITextProvider
 	INotifiedModel
+	Clone() IRuleModel
 	GetIdentifier() string
 	GetSymbols() [][]IRuleModel  // Returns the symbols (abstraction of rhs)
 	GetSymbolType() SymbolType 
