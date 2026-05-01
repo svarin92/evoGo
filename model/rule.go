@@ -172,6 +172,31 @@ func (rm *RuleModel) CreateFrom(node ebnf.Node) IRuleModel {
 	return rm
 }
 
+// Clone creates a deep copy of RuleModel, including rhs.
+func (rm *RuleModel) Clone() IRuleModel {
+    var rhsCopy [][]IRuleModel
+    
+	if rm.rhs != nil {
+        rhsCopy = make([][]IRuleModel, len(rm.rhs))
+    
+		for i, prod := range rm.rhs {
+            rhsCopy[i] = make([]IRuleModel, len(prod))
+    
+			for j, rule := range prod {
+                rhsCopy[i][j] = rule.Clone()
+            }
+
+        }
+
+    }
+    
+    return &RuleModel{
+        Symbol:     rm.GetText(),
+        SymbolType: rm.GetSymbolType(),
+        rhs:        rhsCopy,
+    }
+}
+
 // DoAccept allows the model to accept a visitor.
 func (rm *RuleModel) DoAccept(visitor IVisitor) {
 	

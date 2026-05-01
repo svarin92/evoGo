@@ -16,9 +16,9 @@ type (
 	IIndividual interface {
     	Evaluate(fitness FitnessFunc) error
     	GeneratePhenotype(genomizer IGenomizer) error
-    	Repair(genomizer IGenomizer) error
+    	Repair(immunitarySys IImmuneSystem) error
+		GetFitness() float64
     	GetProductionHistory() [][]IRuleModel
-    	GetFitness() float64
 	}
 
 	// Individual represents an individual in an evolving algorithm.
@@ -62,6 +62,10 @@ func (ind *Individual) Evaluate(fitness FitnessFunc) error {
 	return nil
 }
 
+func (ind *Individual) GetFitness() float64 {
+	return ind.fitness
+}
+
 // GetOrganism returns the organism associated with the individual.
 func (ind *Individual) GetOrganism() IOrganism {
 	return ind.organism
@@ -86,9 +90,9 @@ func (ind *Individual) GeneratePhenotype(genomizer IGenomizer) error {
 	return nil
 }
 
-// Repair repairs the individual using a Genomizer.
-func (ind *Individual) Repair(genomizer IGenomizer) error {
-    return genomizer.RepairIndividual(ind)
+// Repair uses the immune system to repair the individual.
+func (ind *Individual) Repair(immuneSys IImmuneSystem) error {
+    return immuneSys.RepairIndividual(ind)
 }
 
 // SetOrganism associates an organism with the individual.
@@ -107,6 +111,6 @@ func (ind *Individual) String() string {
 /* Exports */
 
 // NewIndividual is a factory function to create a new individual.
-func NewIndividual(genome []int) *Individual {
+func NewIndividual(genome []int) IIndividual {
 	return new(Individual).Create(genome)
 }
