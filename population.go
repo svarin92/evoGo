@@ -8,13 +8,16 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	// "runtime/debug"
 	"sort"
+
+	"evoGo/model"
 )
 
 /* Population */
 
-// Population represents a group of individuals sharing a common Genomizer. 
-// It manages genetic operations (correction, production updates) at the 
+// Population represents a group of individuals sharing a common Genomizer.
+// It manages genetic operations (correction, production updates) at the
 // population level.
 type Population struct {
 
@@ -22,43 +25,62 @@ type Population struct {
 	// population.
 	genomizer   IGenomizer
 	
-	immuneSys   IImmuneSystem
+	immuneSys   IImmune
     
 	// individuals is the list of individuals in the population, sorted by 
 	// fitness.
 	individuals []IIndividual
 }
 
-// Create initializes a Population with a list of individuals and a Genomizer.
+// Create initializes a Population with a list of individuals, a Genomizer and
+// an immune system.
 func (pop *Population) Create(
 	individuals []IIndividual, 
 	genomizer IGenomizer,
-	immuneSys IImmuneSystem,
+	immuneSys IImmune,
 ) (*Population, error) {
 
+	// 1. Verify that genomizer is not nil.
 	if genomizer == nil {
         return nil, fmt.Errorf("genomizer cannot be nil")
     }
 
+	// 2. Check that individuals is not empty.
     if len(individuals) == 0 {
         return nil, fmt.Errorf("individuals cannot be empty")
     }
 
+	// 3. Check that immune system is not nil.
+	if immuneSys == nil {
+        return nil, fmt.Errorf("immune system cannot be nil")
+    }
+
+	// 4. Initialize the population.
 	pop.genomizer = genomizer
 	pop.individuals = individuals
 	pop.immuneSys = immuneSys
+
 	return pop, nil
 }
 
 // Add a failed production to the list of failed productions.
 func (pop *Population) AddToFailedProductions(production []IRuleModel, fitness float64) {
+
+    // -- Debug --
+	// defer func() {
+    //    if r := recover(); r != nil {
+    //        fmt.Printf("Panic in AddToFailedProductions: %v\n", r)
+    //        debug.PrintStack()  // Affiche la stack trace
+    //    }
+    // }()
+
     pop.immuneSys.AddToFailedProductions(production, fitness)
 }
 
 // Correct an individual using their genome.
 func (pop *Population) CorrectByGenome(
-    ind *Individual, 
-    population []*Individual, 
+    ind IIndividual, 
+    population []IIndividual, 
     fitnessThreshold float64, 
     averageFitness float64,
     fitnessFunction FitnessFunc,
@@ -68,7 +90,7 @@ func (pop *Population) CorrectByGenome(
 
 // Correct an individual using grammatical pathways.
 func (pop *Population) CorrectByGrammaticalPaths(
-    ind *Individual,
+    ind IIndividual,
     fitnessThreshold float64,
     fitnessFunction FitnessFunc,
 ) (bool, error) {
@@ -77,18 +99,16 @@ func (pop *Population) CorrectByGrammaticalPaths(
 
 // Correct an individual using a template.
 func (pop *Population) CorrectByTemplate(
-    ind *Individual,
+    ind IIndividual,
     templateFunction TemplateFunc,
     fitnessFunction FitnessFunc,
 ) (bool, error) {
     return pop.immuneSys.CorrectByTemplate(ind, templateFunction, fitnessFunction)
 }       	
 
-// GetIndividuals returns a copy of the individuals slice to avoid external 
-// modifications.
 func (pop *Population) GetIndividuals() []IIndividual {
     individuals := make([]IIndividual, len(pop.individuals))
-    copy(individuals, pop.individuals)
+	copy(individuals, pop.individuals)
     return individuals
 }
 
@@ -99,13 +119,13 @@ func (pop *Population) Size() int {
 
 // Update successful productions in the Genomizer for a given list of 
 // individuals.
-func (pop *Population) UpdateSuccessfulProductions(individuals []*Individual) {
+func (pop *Population) UpdateSuccessfulProductions(individuals []IIndividual) {
     pop.immuneSys.UpdateSuccessfulProductions(individuals)
 }
 
 // Update the pattern library in the Genomizer for a given list of 
 // individuals.
-func (pop *Population) UpdatePatternLibrary(individuals []*Individual) {
+func (pop *Population) UpdatePatternLibrary(individuals []IIndividual) {
     pop.immuneSys.UpdatePatternLibrary(individuals)
 }
 
@@ -122,6 +142,7 @@ func GenerateRandomGenome() []int {
 	return genome
 }
 
+// SortDescending sorts a list of individuals by decreasing fitness.
 func SortDescending(individuals []IIndividual) []IIndividual {
 	sort.Slice(individuals, func(i, j int) bool {
 		return individuals[i].GetFitness() > individuals[j].GetFitness()
@@ -145,7 +166,7 @@ func NewPopulation(size int, grammar IGrammar) (*Population, error) {
 		genome := GenerateRandomGenome()
 
 		// Creates an individual and sets its genome to default values.
-		population[i] = NewIndividual(genome)
+		population[i] = model.NewIndividual(genome)
 
 		if err := population[i].GeneratePhenotype(genomizer); err != nil {
 			return nil, fmt.Errorf(
