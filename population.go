@@ -8,8 +8,9 @@ package main
 import (
 	"fmt"
 	"math/rand"
-	// "runtime/debug"
 	"sort"
+
+	// "runtime/debug"
 
 	"evoGo/model"
 )
@@ -33,7 +34,7 @@ type Population struct {
 }
 
 // Create initializes a Population with a list of individuals, a Genomizer and
-// an immune system.
+// an Immune System.
 func (pop *Population) Create(
 	individuals []IIndividual, 
 	genomizer IGenomizer,
@@ -63,7 +64,8 @@ func (pop *Population) Create(
 	return pop, nil
 }
 
-// Add a failed production to the list of failed productions.
+// AddToFailedProductions adds a failed production to the list of failed 
+// productions.
 func (pop *Population) AddToFailedProductions(production []IRuleModel, fitness float64) {
 
     // -- Debug --
@@ -77,7 +79,7 @@ func (pop *Population) AddToFailedProductions(production []IRuleModel, fitness f
     pop.immuneSys.AddToFailedProductions(production, fitness)
 }
 
-// Correct an individual using their genome.
+// CorrectByGenome corrects an individual using their genome.
 func (pop *Population) CorrectByGenome(
     ind IIndividual, 
     population []IIndividual, 
@@ -88,7 +90,7 @@ func (pop *Population) CorrectByGenome(
 	return pop.immuneSys.CorrectByGenome(ind, population, fitnessThreshold, averageFitness, fitnessFunction)
 }
 
-// Correct an individual using grammatical pathways.
+// CorrectByGrammaticalPaths corrects an individual using grammatical paths.
 func (pop *Population) CorrectByGrammaticalPaths(
     ind IIndividual,
     fitnessThreshold float64,
@@ -97,7 +99,7 @@ func (pop *Population) CorrectByGrammaticalPaths(
 	return pop.immuneSys.CorrectByGrammaticalPaths(ind, fitnessThreshold, fitnessFunction)
 }
 
-// Correct an individual using a template.
+// CorrectByTemplate corrects an individual using a template.
 func (pop *Population) CorrectByTemplate(
     ind IIndividual,
     templateFunction TemplateFunc,
@@ -117,21 +119,21 @@ func (pop *Population) Size() int {
     return len(pop.individuals)
 }
 
-// Update successful productions in the Genomizer for a given list of 
-// individuals.
+// UpdateSuccessfulProductions updates successful productions in the Genomizer 
+// for a given list of individuals.
 func (pop *Population) UpdateSuccessfulProductions(individuals []IIndividual) {
     pop.immuneSys.UpdateSuccessfulProductions(individuals)
 }
 
-// Update the pattern library in the Genomizer for a given list of 
-// individuals.
+// UpdatePatternLibrary updates the pattern library in the Genomizer for a 
+// given list of individuals.
 func (pop *Population) UpdatePatternLibrary(individuals []IIndividual) {
     pop.immuneSys.UpdatePatternLibrary(individuals)
 }
 
 /* Helpers */
 
-// Generate a random genome of size CODONS_SIZE.
+// GenerateRandomGenome generates a random genome of size CODONS_SIZE.
 func GenerateRandomGenome() []int {
 	genome := make([]int, CODONS_SIZE)
 
@@ -152,7 +154,7 @@ func SortDescending(individuals []IIndividual) []IIndividual {
 
 /* Exports */
 
-// Create a new population with a shared Genomizer.
+// NewPopulation creates a new population with a shared Genomizer.
 func NewPopulation(size int, grammar IGrammar) (*Population, error) {
 	genomizer := NewGenomizer(grammar)
 
