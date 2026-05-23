@@ -25,16 +25,16 @@ type (
 	IImmune               = interfaces.IImmune
 	ISuccessfulProduction = interfaces.ISuccessfulProduction
 
-	IRuleModel            = model.IRuleModel
+	IIndividual           = interfaces.IIndividual
+	IRuleModel            = interfaces.IRuleModel
 )
 
 // Alias ​​for concrete types.
 type (
-	SymbolType           = model.SymbolType
-	IIndividual          = model.IIndividual
-	Individual           = model.Individual
+	SymbolType            = model.SymbolType
+	Individual            = model.Individual
 
-	SuccessfulProduction = controller.SuccessfulProduction
+	SuccessfulProduction  = controller.SuccessfulProduction
 )
 
 // Constants for symbol types.
