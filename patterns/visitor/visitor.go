@@ -19,15 +19,6 @@ package visitor
 
 import (
 	"fmt"
-
-	"evoGo/interfaces"
-)
-
-// Interfaces imported to ensure architectural consistency.
-type (
-	IVisited = interfaces.IVisited[IVisitor]
-	IVisitor = interfaces.IVisitor
-	VisitorFunc = interfaces.VisitorFunc
 )
 
 /* VisitedModel */
