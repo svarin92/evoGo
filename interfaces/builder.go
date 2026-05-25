@@ -27,3 +27,6 @@ type IBuilder interface {
 	// Modify the terms constructed via a transformation function.
 	ModifyTerms(func(terms [][]IRuleModel) [][]IRuleModel)
 }
+
+// BuilderFactory is a function that returns a new instance of IBuilder.
+type BuilderFactory func() IBuilder
