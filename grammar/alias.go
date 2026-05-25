@@ -13,10 +13,8 @@ type (
 
 // Interfaces imported to ensure architectural consistency.
 type (
-	IGrammar    = interfaces.IGrammar
-	IParser     = interfaces.IParser
-	IRuleModel  = interfaces.IRuleModel
-	ISerializer = interfaces.ISerializer
-
-	
+	IGrammar          = interfaces.IGrammar
+	IParser           = interfaces.IParser
+	IRuleModel        = interfaces.IRuleModel
+	ISerializer       = interfaces.ISerializer
 )
