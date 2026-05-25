@@ -15,16 +15,6 @@
 // - NotifiedModel: Concrete implementation of INotifiedModel.
 package notifier
 
-import "evoGo/interfaces"
-import "evoGo/patterns/visitor"
-
-// Interfaces imported to ensure architectural consistency.
-type (
-	IVisitor = interfaces.IVisitor
-	IVisited = interfaces.IVisited[IVisitor]
-	VisitedModel = visitor.VisitedModel
-)
-
 /* NotifiedModel */
 
 type (
@@ -57,10 +47,4 @@ func (nm *NotifiedModel) Accept(visitor IVisitor, args ...func() IVisited) {
 // the visit.
 func (nm *NotifiedModel) DoAccept(visitor IVisitor) {
     nm.VisitedModel.DoAccept(visitor)
-}
-
-/* Exports */
-
-func NewNotifiedModel(vm VisitedModel) *NotifiedModel {
-    return &NotifiedModel{vm}
 }
