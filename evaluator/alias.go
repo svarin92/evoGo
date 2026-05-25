@@ -47,7 +47,8 @@ type (
 
 // Alias ​​for concrete types.
 type (
-	ModelVisitor = visitor.ModelVisitor
-	Numeric      = model.Numeric
-	Ontology     = model.Ontology
+	ModelVisitor     = visitor.ModelVisitor
+	
+	Numeric          = model.Numeric
+	Ontology         = model.Ontology
 )
