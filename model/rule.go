@@ -209,6 +209,10 @@ func (rm *RuleModel) DoAccept(visitor IVisitor) {
 
 }
 
+func (rm *RuleModel) GetCount() int {
+    return rm.count
+}
+
 func (rm *RuleModel) GetIdentifier() string {
 	return rm.Production.Production
 }
@@ -319,16 +323,4 @@ func (sm *SequenceModel) IsValid() bool {
 	}
 
 	return true
-}
-
-/* Exports */
-
-// NewRuleModel creates a new RuleModel instance. Function exported to allow 
-// creation from other packages.
-func NewRuleModel(symbol string, symbolType SymbolType, rhs [][]IRuleModel) IRuleModel {
-    return &RuleModel{
-        Symbol:     symbol,
-        SymbolType: symbolType,
-        rhs:        rhs,  // the private rhs field is exported
-    }
 }
