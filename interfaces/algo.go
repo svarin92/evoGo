@@ -2,7 +2,7 @@
 // Use of this source code is governed by the MIT license.
 // See the LICENSE file for details.
 //
-// Package interfaces defines the specialized interfaces for EBNF parsing 
+// The interfaces package defines the specialized interfaces for EBNF parsing 
 // algorithms. These interfaces extend IVisitor to allow specialization by 
 // model type.
 package interfaces
@@ -73,3 +73,7 @@ type IAlgo interface {
 	// MakeTermCase creates a parsing algorithm for EBNF terms.
 	MakeTermCase(vf VisitorFunc) IParseTerm
 }
+
+// AlgoFactory is a functional type for creating an instance of IAlgo. 
+// This allows for flexible initialization and dependency injection.
+type AlgoFactory func() IAlgo

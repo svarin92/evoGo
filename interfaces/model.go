@@ -2,7 +2,7 @@
 // Use of this source code is governed by the MIT license.
 // See the LICENSE file for details.
 //
-// Package interfaces defines the interfaces for EBNF models. 
+// The interfaces package defines the interfaces for EBNF models. 
 package interfaces
 
 import "github.com/alecthomas/participle/v2/ebnf"
@@ -56,6 +56,7 @@ type IRuleModel interface {
     ITextProvider
 	INotifiedModel
 	Clone() IRuleModel
+	GetCount() int
 	GetIdentifier() string
 	GetSymbols() [][]IRuleModel  // Returns the symbols (abstraction of rhs)
 	GetSymbolType() SymbolType 
