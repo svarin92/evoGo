@@ -2,38 +2,18 @@
 // Use of this source code is governed by the MIT license.
 // See the LICENSE file for details.
 //
-// Package patterns implements the Builder design pattern for constructing rule
-// models from an EBNF AST. This Builder is designed for use with the Visitor
-// and Notifier patterns, to enable transformations, validations, or notifications
-// during rule construction.
-// It is a key component of the evoGo project, particularly for managing evolving
-// grammars.
+// The builder package implements the Builder design pattern for constructing 
+// rule models from an EBNF AST. This Builder is designed for use with the 
+// Visitor and Notifier patterns, to enable transformations, validations, or 
+// notifications during rule construction.
+// It is a key component of the evoGo project, particularly for managing 
+// evolving grammars.
 package builder
 
 import (
 	"fmt"
 
 	"github.com/alecthomas/participle/v2/ebnf"
-
-	"evoGo/interfaces"
-	"evoGo/model"
-)
-
-// Interfaces imported to ensure architectural consistency.
-type (
-	IBuilder = interfaces.IBuilder
-	IVisitor = interfaces.IVisitor
-	IVisited = interfaces.IVisited[IVisitor]
-
-	IRuleModel = interfaces.IRuleModel
-	EBNFModel = model.EBNFModel
-	ExpressionModel = model.ExpressionModel
-	IdentifierModel = model.IdentifierModel
-	LiteralModel = model.LiteralModel
-	RuleModel = model.RuleModel
-	SequenceModel = model.SequenceModel
-	SubExpressionModel = model.SubExpressionModel
-	TermModel = model.TermModel
 )
 
 /* BuilderFactory */
@@ -56,7 +36,7 @@ func (rb *RuleBuilder) Create() *RuleBuilder {
 }
 
 // AddTermGroup adds a term group to the builder.
-func (rb *RuleBuilder) AddTermGroup(terms []*model.RuleModel) {
+func (rb *RuleBuilder) AddTermGroup(terms []*RuleModel) {
     rb.terms = append(rb.terms, terms)
 }
 
@@ -317,14 +297,4 @@ func (rb *RuleBuilder) ModifyConcreteTerms(modifier func(terms [][]*RuleModel) [
 
     // Update the builder's terms with the filtered and modified terms.
     rb.terms = validTerms
-}
-
-/* Exports */
-
-// BuilderFactory is a function that returns a new instance of IBuilder.
-type BuilderFactory func() IBuilder
-
-// NewBuilder creates and returns a new instance of RuleBuilder.
-func NewBuilder() IBuilder {
-	return new(RuleBuilder).Create()
 }
