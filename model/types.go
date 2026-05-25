@@ -6,11 +6,6 @@
 // expressions.
 package model
 
-import (
-	"evoGo/interfaces"
-	"evoGo/patterns/notifier"
-)
-
 /*
 	The self-referential EBNF is:
 
@@ -40,31 +35,7 @@ import (
 	- etc.
 */
 
-// Interfaces imported to ensure architectural consistency.
-type (
-	IVisitor = interfaces.IVisitor
-
-	NotifiedModel = notifier.NotifiedModel
-
-	IParseEBNF = interfaces.IParseEBNF
-	IParseExpression = interfaces.IParseExpression
-	IParseRule = interfaces.IParseRule
-	IParseSequence = interfaces.IParseSequence
-	IParseSubExpression = interfaces.IParseSubExpression
-	IParseTerm = interfaces.IParseTerm
-
-	ITextProvider = interfaces.ITextProvider
-
-	SymbolType = interfaces.SymbolType
-	IEBNFModel = interfaces.IEBNFModel
-	IExpressionModel = interfaces.IExpressionModel
-	IIdentifierModel = interfaces.IIdentifierModel
-	ILiteralModel = interfaces.ILiteralModel
-	IRuleModel = interfaces.IRuleModel
-	ISequenceModel = interfaces.ISequenceModel
-	ISubExpressionModel = interfaces.ISubExpressionModel
-	ITermModel = interfaces.ITermModel
-)
+import "evoGo/interfaces"
 
 // Constants for symbol types.
 const (
