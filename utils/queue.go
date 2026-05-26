@@ -4,6 +4,7 @@
 package utils
 
 // A generic FIFO queue.
+//
 // Example usage:
 //   queue := NewQueue[int]()
 //   queue.Enqueue(1, 2, 3)
@@ -13,6 +14,7 @@ type Queue[T any] struct {
 }
 
 // Enqueue adds one or more elements to the end of the queue.
+//
 // Example:
 //   queue.Enqueue(1, 2, 3)
 func (q *Queue[T]) Enqueue(elements ...T) {
@@ -21,6 +23,7 @@ func (q *Queue[T]) Enqueue(elements ...T) {
 
 // Dequeue removes and returns the first element from the queue.
 // Returns the value T as zero if the queue is empty.
+//
 // Example:
 //   val := queue.Dequeue()
 func (q *Queue[T]) Dequeue() T {
@@ -36,6 +39,7 @@ func (q *Queue[T]) Dequeue() T {
 }
 
 // IsEmpty returns true if the queue is empty.
+//
 // Example :
 //   if queue.IsEmpty() { ... }
 func (q *Queue[T]) IsEmpty() bool {
@@ -43,6 +47,7 @@ func (q *Queue[T]) IsEmpty() bool {
 }
 
 // Size returns the number of elements in the queue.
+//
 // Example :
 //   size := queue.Size()
 func (q *Queue[T]) Size() int {
@@ -50,6 +55,7 @@ func (q *Queue[T]) Size() int {
 }
 
 // NewQueue creates a new empty queue.
+//
 // Example:
 //   queue := NewQueue[string]()
 func NewQueue[T any]() *Queue[T] {

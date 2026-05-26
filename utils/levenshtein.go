@@ -6,8 +6,9 @@ package utils
 // LevenshteinDistance calculates the Levenshtein distance between two strings.
 // The Levenshtein distance is the minimum number of operations (insertions, 
 // deletions, or substitutions) required to transform s1 into s2.
+//
 // Example:
-//   distance := LevenshteinDistance("kitten", "sitting") // Returns 3
+//   distance := LevenshteinDistance("kitten", "sitting")  // Returns 3
 func LevenshteinDistance(s1, s2 string) int {
     m := len(s1)
     n := len(s2)
@@ -48,8 +49,9 @@ func LevenshteinDistance(s1, s2 string) int {
 
 // Min returns the smallest value from a list of integers. Returns 0 if the 
 // list is empty.
+//
 // Example:
-//   minimum := Min(1, 2, 3) // Returns 1
+//   minimum := Min(1, 2, 3)  // Returns 1
 func Min(values ...int) int {
     if len(values) == 0 {
         return 0

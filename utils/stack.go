@@ -4,6 +4,7 @@
 package utils
 
 // Stack is a generic LIFO stack.
+//
 // Example of us:
 //   stack := NewStack[int]()
 //   stack.Push(1, 2, 3)
@@ -13,6 +14,7 @@ type Stack[T any] struct {
 }
 
 // IsEmpty returns true if the stack is empty.
+//
 // Example:
 //   if stack.IsEmpty() { ... }
 func (s *Stack[T]) IsEmpty() bool {
@@ -20,6 +22,7 @@ func (s *Stack[T]) IsEmpty() bool {
 }
 
 // Size returns the number of elements in the stack.
+//
 // Example:
 //   size := stack.Size()
 func (s *Stack[T]) Size() int {
@@ -28,6 +31,7 @@ func (s *Stack[T]) Size() int {
 
 // Pop removes and returns the last element from the stack. Returns the value 
 // of T to zero if the stack is empty.
+//
 // Example:
 //   val := stack.Pop()
 func (s *Stack[T]) Pop() T {
@@ -43,6 +47,7 @@ func (s *Stack[T]) Pop() T {
 }
 
 // Push adds one or more elements to the top of the stack.
+//
 // Example:
 //   stack.Push(1, 2, 3)
 func (s *Stack[T]) Push(elements ...T) {
@@ -50,6 +55,7 @@ func (s *Stack[T]) Push(elements ...T) {
 }
 
 // NewStack creates a new empty stack.
+//
 // Example:
 //   stack := NewStack[string]()
 func NewStack[T any]() *Stack[T] {
