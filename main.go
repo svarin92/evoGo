@@ -7,6 +7,7 @@ import (
 	"github.com/alecthomas/kong"
 
 	"evoGo/evaluator"
+	"evoGo/ge"
 	"evoGo/grammar"
 	"evoGo/operators"
 )
@@ -46,14 +47,13 @@ func main() {
 	//   ones, preserving elites.
 	// - TournamentSelection: Selects individuals for breeding via a 
 	//   tournament.
-	bestEver, err := SearchLoop(
+	bestEver, err := ge.SearchLoop(
 		GENERATIONS,        // Total number of generations
 		POPULATION_SIZE,    // Population size
 		grammar,            // Grammar used to generate individuals
 		target,	            // Target to be reached
 		func(newIndividuals, oldIndividuals []IIndividual, eliteSize int) []IIndividual { 
-			return operators.GenerationalReplacement(newIndividuals, oldIndividuals, eliteSize) 
-		},
+			return operators.GenerationalReplacement(newIndividuals, oldIndividuals, eliteSize),
 		func(individuals []IIndividual, tournamentSize int) []IIndividual { 
 			return operators.TournamentSelection(individuals, tournamentSize) 
 		},
