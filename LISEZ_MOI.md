@@ -4,7 +4,7 @@
 
 ## **Description**
 
-**evoGo** est une preuve de concept d'un **moteur symbolique évolutionnaire** développé en **Go**, inspiré des principes de l’**Évolution Grammaticale (GE)**. Il est conçu pour générer et optimiser des **structures symboliques** (expressions, programmes) à partir de **grammaires formelles** (CFG - Context-Free-Grammar). Contrairement aux algorithmes génétiques (AG) traditionnels, qui manipulent des valeurs numériques, **evoGo** utilise une approche symbolique pour produire des solutions structurées et interprétables. 
+**evoGo** est une preuve de concept d'un **moteur symbolique évolutionnaire** développé en **Go**, inspiré des principes de l’**Évolution Grammaticale (GE)**. Il est conçu pour générer et optimiser des **structures symboliques** (expressions, programmes) à partir de **grammaires formelles** (CFG - Context-Free Grammar). Contrairement aux algorithmes génétiques (AG) traditionnels, qui manipulent des valeurs numériques, **evoGo** utilise une approche symbolique pour produire des solutions structurées et interprétables. 
 
 Bien que le projet partage de nombreux points communs avec un moteur d'évolution grammaticale classique — notamment l'utilisation d'un espace de recherche symbolique, d'un cycle évolutif (sélection, croisement, mutation) et d'une séparation entre génotype et phénotype —, il s'inscrit dans une vision plus large. L'Évolution Grammaticale repose purement sur des choix séquentiels via des règles de réécriture (généralement rédigées au format BNF - Backus-Naur form), tandis qu'un moteur symbolique évolutionnaire comme evoGo peut intégrer des mécanismes de correction et de manipulation plus flexibles, orientés sémantiquement ou par des phases de filtrage/correction dédiées. Ainsi, l'évolution grammaticale peut être considérée comme une instanciation formelle d'un paradigme symbolique plus vaste qu'evoGo cherche à explorer et à moduler en Go.
 
@@ -22,7 +22,7 @@ Bien que le projet partage de nombreux points communs avec un moteur d'évolutio
 **evoGo** s’inspire des travaux fondateurs en **Évolution Grammaticale (GE)** :
 
 - **PonyGE** : framework d’Évolution Grammaticale en Python, largement utilisé dans la littérature pour ses capacités à générer des programmes évolutifs.
-- **Michael O'Neill** and Conor Ryan : pionniers de la GE, auteurs de l’ouvrage *Grammatical Evolution*: Evolutionary Automatic Programming in an Arbitrary Language (Kluwer Academic Publishers, 2003), qui pose les bases théoriques de cette approche.
+- **Michael O'Neill** et Conor Ryan : pionniers de la GE, auteurs de l’ouvrage *Grammatical Evolution*: Evolutionary Automatic Programming in an Arbitrary Language (Kluwer Academic Publishers, 2003), qui pose les bases théoriques de cette approche.
 
 ---
 
@@ -199,13 +199,13 @@ Ces perspectives et cette puissance d'exploration sont rendues possibles précis
 
 ## **Références**
 
-1. **PonyGE** : [PonyGE - Grammatical Evolution in Python](https://github.com/jmmcd/ponyge)
-2. **Grammatical Evolution** : Michael O'Neill and Conor Ryan, [Grammatical Evolution: Evolutionary
+1. [PonyGE](https://github.com/jmmcd/ponyge) : Grammatical Evolution in Python
+2. Michael O'Neill and Conor Ryan, [Grammatical Evolution: Evolutionary
 Automatic Programming in an Arbitrary Language](https://link.springer.com/book/10.1007/978-1-4615-0447-4), Kluwer Academic
 Publishers, 2003.
-4. **Ichiban/Prolog** : [Prolog in Go](https://github.com/ichiban/prolog)
-5. **go-actor** : [Actor Model for Go](https://github.com/vladopajic/go-actor)
-6. **Bibliothèques Go** :
+3. [Ichiban/Prolog](https://github.com/ichiban/prolog) : Prolog in Go
+4. [go-actor](https://github.com/vladopajic/go-actor) : Actor Model for Go
+5. **Bibliothèques Go** :
   - [kong](https://github.com/alecthomas/kong) : Parsing des arguments en ligne de commande.
   - [participle/v2/ebnf](https://github.com/alecthomas/participle) : Parsing des grammaires EBNF.
 
