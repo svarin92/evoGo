@@ -1,0 +1,82 @@
+// --- Grammar for lower case letters ---
+grammar = string .
+string = letter | letter string .
+letter = vowel | consonant | space .
+space = "_" .
+// Vowels and consonants.
+vowel = "a" | "e" | "o" | "i" | "u" | "y" .
+consonant = "g" | "v" | "w" | "b" | "c" | "d" | "l" | "n" .
+// empty = "ε" .
+
+// ---
+// grammar = sequence.
+// sequence = pair | pair sequence.
+// pair = letter letter.
+// letter = "a" | "b".
+
+// ---
+// grammar = string.
+// string = syllable | syllable letter | syllable string.
+// syllable = letter letter.
+// letter = "a" | "b".
+
+// ---
+// grammar = string .
+// string = letter | letter string .
+
+// string = syllable | syllable string .
+// string = syllable .
+// string =  letters .
+// letters = letter letter .
+
+// syllable = vowel consonant .         // Non-terminal + non-terminal.
+// syllable = letter letter .
+// syllable = "a" letter .              // Terminal + non-terminal.
+// syllable = letter "b" .              // Non-terminal + terminal.
+// syllable = "a" "b" .                 // Terminal + terminal.
+// syllable = "a" letter | "b" letter .
+
+// letter = vowel | consonant | space .
+// letter = "a" | "b" .
+// vowel = "a" | "e" .
+// consonant = "b" | "c" .
+// space = "_" .
+// empty = "ε" .
+
+// ---
+// string = syllable | syllable string .
+// string_tail = ε | "a" string_tail .
+// syllable = "a" "b" .
+
+// ---
+// grammar = string .
+// string = letter | letter string | syllabe string .
+// syllabe = consonant vowel .
+// word = letter space letter .
+// phrase = word space word .
+// letter = vowel | consonant | space .
+// space = "_" .
+// vowel = "a" | "e" .
+// consonant = "b" | "c" .
+// empty = "ε" .
+
+
+// ---
+// grammar = string .
+// string = letters .
+// letters = letter letter letter letter letter letter .
+// letter = vowel | consonant | space .
+// space = "_" .
+// vowel = "a" | "e" | "o" | "i" | "u" | "y" .
+// consonant = "g" | "v" | "w" | "b" | "c" | "d" | "l" | "n" .
+// empty = "ε" .
+
+
+// ---
+// grammar = string .
+// string = letter | letter string | string_letter_tail_a_tail .
+// string_letter_tail_a_tail = "a" letter .
+// letter = vowel | consonant | space .
+// vowel = "a" | "e" .
+// consonant = "b" | "c" .
+// space = "_" .
