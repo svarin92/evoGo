@@ -175,7 +175,7 @@ Best individual: phenotype = golden, fitness = 1.00, Used Codons: 14
 
 ## **Towards a Self-Organizing and Self-Learning System**
 
-The prospects for evoGo center on a profound convergence between distributed self-organization and formal symbolic reasoning, laying the groundwork for a truly autonomous system. Moving beyond the strict confines of traditional genetic algorithm optimization—typically used to describe the generative structures of grammatical evolution—the architecture aims to merge the adaptive plasticity of cellular populations with the inferential rigor of symbolic logic, thereby unifying behavioral emergence and semantic correctness within a single Go-based ecosystem.
+The prospects for evoGo center on a profound convergence between distributed self-organization and formal symbolic reasoning, laying the groundwork for a truly autonomous system. Moving beyond the strict confines of traditional genetic algorithm optimization — typically used to describe the generative structures of grammatical evolution — the architecture aims to merge the adaptive plasticity of cellular populations with the inferential rigor of symbolic logic, thereby unifying behavioral emergence and semantic correctness within a single Go-based ecosystem.
 
 ### **Genetic Homeostasis and Cellular Dynamics**
 
@@ -183,7 +183,7 @@ To enhance the system's structural robustness, the primary approach involves hyb
 
 ### **Advanced Symbolic Phenotype Evaluation and Logical Inference**
 
-Alongside self-organization, phenotypic validation can be enhanced with high-level formal semantics through the integration of a [Prolog](https://github.com/ichiban/prolog) engine—or expert system—embedded in Go. Unlike numerical or syntactic fitness functions, this symbolic evaluation analyzes generated structures using knowledge bases and explicit logical rules. The system goes beyond merely measuring quantitative performance; it assesses structural validity, contextual coherence, and adherence to complex constraints—such as geometric or aesthetic criteria. This combination of evoGo’s evolutionary exploration and Prolog’s deductive power enables the engine to guide evolution not through simple statistical approximation, but through structured symbolic reasoning, paving the way for genuine cognitive autonomy.
+Alongside self-organization, phenotypic validation can be enhanced with high-level formal semantics through the integration of a [Prolog](https://github.com/ichiban/prolog) engine — or expert system — embedded in Go. Unlike numerical or syntactic fitness functions, this symbolic evaluation analyzes generated structures using knowledge bases and explicit logical rules. The system goes beyond merely measuring quantitative performance; it assesses structural validity, contextual coherence, and adherence to complex constraints — such as geometric or aesthetic criteria. This combination of evoGo’s evolutionary exploration and Prolog’s deductive power enables the engine to guide evolution not through simple statistical approximation, but through structured symbolic reasoning, paving the way for genuine cognitive autonomy.
 
 These possibilities and this exploratory power are made possible precisely because evoGo breaks free from a purely grammatical framework. It establishes itself as a **true evolutionary symbolic engine**, capable not only of manipulating formal structures but also of shaping their semantics, correctness, and emergent behavior.
 
@@ -199,15 +199,15 @@ These possibilities and this exploratory power are made possible precisely becau
 
 ## **References**
 
-1. [PonyGE](https://github.com/jmmcd/ponyge) : Grammatical Evolution in Python
+1. [PonyGE](https://github.com/jmmcd/ponyge): Grammatical Evolution in Python.
 2. Michael O'Neill and Conor Ryan, [Grammatical Evolution: Evolutionary
 Automatic Programming in an Arbitrary Language](https://link.springer.com/book/10.1007/978-1-4615-0447-4), Kluwer Academic
 Publishers, 2003.
-3. [Ichiban/Prolog](https://github.com/ichiban/prolog) : Prolog in Go
-4. [go-actor](https://github.com/vladopajic/go-actor) : Actor Model for Go
-5. **Bibliothèques Go** :
-  - [kong](https://github.com/alecthomas/kong) : Parsing des arguments en ligne de commande.
-  - [participle/v2/ebnf](https://github.com/alecthomas/participle) : Parsing des grammaires EBNF.
+3. [Ichiban/Prolog](https://github.com/ichiban/prolog): The only reasonable scripting engine for Go.
+4. [go-actor](https://github.com/vladopajic/go-actor): A lightweight library for writing concurrent programs in Go using the Actor model.
+5. **Go Libraries** :
+  - [kong](https://github.com/alecthomas/kong): A command-line parser for Go.
+  - [participle/v2/ebnf](https://github.com/alecthomas/participle) : A parser library for Go.
 
 ---
 
