@@ -228,4 +228,4 @@ This project is distributed under the **MIT License**. See the [LICENSE](LICENSE
 For any questions or collaboration:
 
 - **Stéphane Varin** : [svarin92@gmail.com](mailto:svarin92@gmail.com)
-- **Dépôt GitHub** : [github.com/svarin92/evoGo](https://github.com/svarin92/evoGo)
+- **GitHub Repository** : [github.com/svarin92/evoGo](https://github.com/svarin92/evoGo)
