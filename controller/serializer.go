@@ -7,21 +7,23 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 
 	"github.com/alecthomas/participle/v2/ebnf"
 
+	"evoGo/grammar/optimizations"
 	"evoGo/patterns/algo"
 	"evoGo/patterns/builder"
-	"evoGo/grammar/optimizations"
 )
 
 /* Serializer */
 
-// Serializer is responsible for serializing an EBNF grammar into a set of 
-// rules and symbols. The nodes produced by the EBNF parser are traversed 
+// Serializer is responsible for serializing an EBNF grammar into a set of
+// rules and symbols. The nodes produced by the EBNF parser are traversed
 // before being written back into the symbol table.
 type Serializer struct {
 	rules     map[string]IRuleModel
+	terminals map[string]bool
 	lhs       string
 	startRule string
 
@@ -74,6 +76,8 @@ func (s *Serializer) DoHandleExpression(model *ExpressionModel) {
 			}
 
 		} else {
+
+			// -- Error --
 			log.Printf("Expression failed to build alternative at index %d: %v \n", i, err)
 		}
 
@@ -81,6 +85,8 @@ func (s *Serializer) DoHandleExpression(model *ExpressionModel) {
 
 	// Checks if the model is valid after processing.
 	if !model.IsValid() {
+
+		// -- Warning --
 		log.Printf("Expression model is invalid after processing")
 	}
 
@@ -94,7 +100,10 @@ func (s *Serializer) DoHandleIdentifier(model *IdentifierModel) {
 
 	// Checks if the identifier is valid after proceeding.
 	if !model.IsValid() {
+
+		// -- Warning --
 		log.Printf("Invalid Identifier : %v", model)
+		
 		return
 	}
 
@@ -108,7 +117,10 @@ func (s *Serializer) DoHandleLiteral(model *LiteralModel) {
 
 	// Checks if the literal is valid after proceeding.
 	if !model.IsValid() {
+
+		// -- Warning --
 		log.Printf("Invalid literal : %v", model)
+		
 		return
 	}
 
@@ -129,7 +141,10 @@ func (s *Serializer) DoHandleRule(model *RuleModel) {
 	if existingRule := s.rules[s.lhs]; existingRule != nil {
 
 		// Handles the case where a rule already exists for this symbol.
+
+		// -- Warning --
 		log.Printf("Rule %s already exists. Consider replacing or merging.", s.lhs)
+		
 		return
 	}
 
@@ -138,7 +153,10 @@ func (s *Serializer) DoHandleRule(model *RuleModel) {
 
 	// Checks if the rule is valid after proceeding.
 	if !model.IsValid() {
+
+		// -- Warning --
 		log.Printf("Invalid rule: %v", model)
+		
 		return
 	}
 
@@ -146,7 +164,10 @@ func (s *Serializer) DoHandleRule(model *RuleModel) {
 	if rhsExpr, err := s.builder.BuildExpression(n, s.expressionCase); err == nil && rhsExpr != nil {
 		model.SetSymbols(rhsExpr)
 	} else {
-		log.Printf("Error building expression for rule %s: %v", s.lhs, err)
+
+		// -- Error --
+		log.Printf("DoHandleRule: Error building expression for rule %s: %v", s.lhs, err)
+
 	}
 
 	// Applies the left factorization to the rule.
@@ -155,7 +176,10 @@ func (s *Serializer) DoHandleRule(model *RuleModel) {
 	if factorizedModel, ok := factorizedModel.(*RuleModel); ok {
     	model = factorizedModel  // Updates model with the factored rule
 	} else {
-    	log.Printf("Error: LeftFactorize returned an unexpected type (type: %T)", factorizedModel)
+
+		// -- Error --
+    	log.Printf("DoHandleRule: LeftFactorize returned an unexpected type (type: %T)", factorizedModel)
+
 	}
 	
 	s.rules[s.lhs] = model
@@ -177,7 +201,10 @@ func (s *Serializer) DoHandleRules(model *EBNFModel) {
 			optimizations.IndirectLeftRecurse(s.rules)
 
 		} else {
+
+			// -- Error --
 			log.Printf("Grammar failed to build production at index %d: %v \n", i, err)
+
 		}
 
 	}
@@ -213,14 +240,20 @@ func (s *Serializer) DoHandleSequence(model *SequenceModel) {
 			}
 
 		} else {
+
+			// -- Error --
 			log.Printf("Sequence failed to build term at index %d in sequence: %v \n", i, err)
+
 		}
 
 	}
 
 	// Performs any necessary validation after processing all terms.
 	if !model.IsValid() {
+
+		// -- Warning --
 		log.Printf("Sequence model is invalid after processing")
+
 	}
 
 }
@@ -235,14 +268,20 @@ func (s *Serializer) DoHandleSubExpression(model *SubExpressionModel) {
 		if rhsSeq, err := s.builder.BuildSequence(n, s.sequenceCase); err == nil && rhsSeq != nil {
 			model.Symbols = append(model.Symbols, rhsSeq)
 		} else {
+
+			// -- Error --
 			log.Printf("Expression failed to build alternative at index %d: %v \n", i, err)
+
 		}
 
 	}
 
 	// Checks if the model is valid after processing.
 	if !model.IsValid() {
+
+		// -- Warning --
 		log.Printf("Sub-expression model is invalid after processing")
+
 	}
 
 }
@@ -257,15 +296,25 @@ func (s *Serializer) DoHandleTerm(model *TermModel) {
 		if rhsIdent, err := s.builder.BuildIdentifier(n, s.identifierCase); err == nil && rhsIdent != nil {
 			model.SetLexeme(rhsIdent)
 		} else {
-			log.Printf("Failed to create identifier: %v", err)
+
+			// -- Error --
+			log.Printf("DoHandleTerm: Failed to create identifier: %v", err)
+
 		}
 
 	case n.Literal != "":
 
 		if rhsText, err := s.builder.BuildLiteral(n, s.literalCase); err == nil && rhsText != nil {
 			model.SetLexeme(rhsText)
+
+			// Literals are always terminals.
+			literal := strings.Trim(n.Literal, `"`)
+            s.terminals[literal] = true
 		} else {
-			log.Printf("Failed to create literal: %v", err)
+
+			// -- Error --
+			log.Printf("DoHandleTerm: Failed to create literal: %v", err)
+
 		}
 
 	case n.Group != nil:
@@ -279,15 +328,26 @@ func (s *Serializer) DoHandleTerm(model *TermModel) {
 			if concreteLexeme, ok := model.GetLexeme().(*RuleModel); ok {
     			concreteLexeme.SetSymbols(optimizedRHS)
 			} else {
-    			log.Printf("Error: lexeme is not a *RuleModel (type : %T)", model.GetLexeme())
+
+				// -- Error --
+    			log.Printf("DoHandleTerm: Lexeme is not a *RuleModel (type : %T)", model.GetLexeme())
+
 			}
 		
 		} else {
-			log.Printf("Failed to create sub-expression '%s' for node %s: %s", n.Group.Expr, n, err)
+
+			// -- Error --
+			log.Printf("DoHandleTerm: Failed to create sub-expression '%s' for node %s: %s", n.Group.Expr, n, err)
+
 		}
 
 	}
 
+}
+
+// GetRules returns the list of grammar rules.
+func (s *Serializer) GetRules() map[string]IRuleModel {
+	return s.rules
 }
 
 // GetStartRule returns the starting rule of the grammar.
@@ -295,9 +355,8 @@ func (s *Serializer) GetStartRule() string {
 	return s.startRule
 }
 
-// GetRules returns the list of grammar rules.
-func (s *Serializer) GetRules() map[string]IRuleModel {
-	return s.rules
+func (s *Serializer) GetTerminals() map[string]bool {
+    return s.terminals
 }
 
 // HandleExpressionFunc returns a function that handles expression models.
@@ -306,7 +365,10 @@ func (s *Serializer) HandleExpressionFunc() func(any) {
 		model, ok := data.(*ExpressionModel)
 
 		if !ok {
+
+			// -- Error --
 			log.Println(`Error: model is not an expression model`)
+
 		} else {
 			s.DoHandleExpression(model)
 		}
@@ -320,7 +382,10 @@ func (s *Serializer) HandleIdentifierFunc() func(any) {
 		model, ok := data.(*IdentifierModel)
 
 		if !ok {
+
+			// -- Error --
 			log.Println(`Error: model is not an identifier model`)
+
 		} else {
 			s.DoHandleIdentifier(model)
 		}
@@ -334,7 +399,10 @@ func (s *Serializer) HandleLiteralFunc() func(any) {
 		model, ok := data.(*LiteralModel)
 
 		if !ok {
+
+			// -- Error --
 			log.Println(`Error: model is not a literal model`)
+
 		} else {
 			s.DoHandleLiteral(model)
 		}
@@ -348,7 +416,10 @@ func (s *Serializer) HandleRuleFunc() func(any) {
 		model, ok := data.(*RuleModel)
 
 		if !ok {
+
+			// -- Error --
 			log.Println(`Error: model is not a rule model`)
+
 		} else {
 			s.DoHandleRule(model)
 		}
@@ -362,7 +433,10 @@ func (s *Serializer) HandleRulesFunc() func(any) {
 		model, ok := data.(*EBNFModel)
 
 		if !ok {
+
+			// -- Error --
 			log.Println(`Error: model is not a ebnf model`)
+
 		} else {
 			s.DoHandleRules(model)
 		}
@@ -376,7 +450,10 @@ func (s *Serializer) HandleSequenceFunc() func(any) {
 		model, ok := data.(*SequenceModel)
 
 		if !ok {
+
+			// -- Error --
 			log.Println(`Error: model is not a sequence model`)
+
 		} else {
 			s.DoHandleSequence(model)
 		}
@@ -391,7 +468,10 @@ func (s *Serializer) HandleSubExpressionFunc() func(any) {
 		model, ok := data.(*SubExpressionModel)
 
 		if !ok {
+
+			// -- Error --
 			log.Println(`Error: model is not a sub-expression model`)
+
 		} else {
 			s.DoHandleSubExpression(model)
 		}
@@ -405,7 +485,10 @@ func (s *Serializer) HandleTermFunc() func(any) {
 		model, ok := data.(*TermModel)
 
 		if !ok {
+
+			// -- Error --
 			log.Println(`Error: model is not a term model`)
+			
 		} else {
 			s.DoHandleTerm(model)
 		}
@@ -428,10 +511,16 @@ func (s *Serializer) ToString() string {
 }
 
 // Serialize serializes an EBNF grammar into a set of rules and symbols.
-func (s *Serializer) Serialize(rules map[string]IRuleModel, node ebnf.Node) error {
+func (s *Serializer) Serialize(
+	rules map[string]IRuleModel, 
+	node ebnf.Node,
+) error {
 	
-	// Assigns the provided rules.
+	// Assigns the provided rules to s.rules.
 	s.rules = rules
+
+	// Initializes the terminal map.
+    s.terminals = make(map[string]bool)
 
 	// Initialize internal algorithms and data structures.
 	s.MakeAlgo()
