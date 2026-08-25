@@ -27,7 +27,7 @@ type LinguisticPattern struct {
     SemanticTag     string          // A semantic label (e.g., "vowel_transition", "word_start")
 }
 
-/* Linguistic Pattern Library */
+/* LinguisticPatternLibrary */
 
 // Pattern library indexed by codon sequence (for fast searching) and 
 // semantics (for searching by grammatical function).
@@ -67,7 +67,7 @@ func (lib *LinguisticPatternLibrary) FindPatternsBySemantics(tag string) []Lingu
     return lib.PatternsBySemantics[tag]
 }
 
-// Update the fitness of an existing motif, identified by its codon sequence.
+// Update the fitness of an existing pattern, identified by its codon sequence.
 func (lib *LinguisticPatternLibrary) UpdatePatternFitness(block []int, newFitness float64) bool {
     blockKey := fmt.Sprintf("%v", block)
 
