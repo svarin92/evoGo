@@ -32,7 +32,19 @@ func NewTemplateEvaluator(target any) IEvaluable {
 func NewTemplate(target any) TemplateFunc {
 	template := func() IEvaluable { return NewTemplateEvaluator(target) }
 	return func(individual IIndividual) bool {
+
+		// -- Debug --
+		// log.Printf("templateFunction: BEFORE Format: individual phenotype=%q\n", individual.GetPhenotype())
+
 		evaluator := template()
-		return evaluator.Format(individual)
+		result := evaluator.Format(individual)
+
+		// -- Debug --
+		// log.Printf("templateFunction: AFTER Format: individual phenotype=%q, result=%v\n", 
+		// 	individual.GetPhenotype(), 
+		// 	result,
+		// )
+
+		return result
 	}
 }
