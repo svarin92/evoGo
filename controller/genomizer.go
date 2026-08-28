@@ -1401,31 +1401,14 @@ func (g *Genomizer) CorrectByGrammaticalPaths(
         return false, fmt.Errorf("individual is not *Individual")
     }
 
-    // -- Debug -- Initial log: State of ncRNAs BEFORE any correction.
-    // log.Printf(
-    //     "CorrectByGrammaticalPaths: BEFORE: ARNnc: %v, Stack: %v, Genome: %v, Phenotype: %q, History: %v Fallback phenotype: %v",
-    //         concreteInd.GetDynamicRules(), 
-    //         concreteInd.GetDynamicRuleStack(),
-    //         concreteInd.GetGenome(),    
-    //         concreteInd.GetPhenotype(),
-    //         concreteInd.GetProductionHistory(),
-    //         concreteInd.GetLastValidPhenotype(),
-    // )
-
-    // Save from the initial state for restoration in case of failure.
-    oldFitness := concreteInd.GetFitness()
-    oldPhenotype := concreteInd.GetPhenotype()
-    oldGenome := make([]int, len(concreteInd.GetGenome()))
-    copy(oldGenome, concreteInd.GetGenome())
-    oldHistory := utils.DeepCopyProductionHistory(concreteInd.GetProductionHistory())
-    oldLastValidPhenotype := concreteInd.GetLastValidPhenotype()
-    oldExhauted := concreteInd.GetExhausted()
-
     // Store the fitness of the productions before correction.
     for _, production := range concreteInd.GetProductionHistory() {
         key := fmt.Sprintf("%v", production)
         concreteInd.SetOldProductionFitness(key, g.GetAverageFitness(production))
     }
+
+    // Save the initial state.
+    oldState := model.SaveIndividualState(concreteInd)
 
     // Convert the phenotype to a string of characters.
     phenotypeStr, err := ConvertPhenotypeToString(concreteInd.GetPhenotype())
@@ -1444,6 +1427,7 @@ func (g *Genomizer) CorrectByGrammaticalPaths(
     productionSequence, err := g.RebuildProductionSequenceFromPhenotype(phenotypeStr, maxDepth, concreteInd)
     
     if err != nil {
+        model.RestoreIndividualState(concreteInd, oldState)
         return false, fmt.Errorf("failed to rebuild production sequence: %w", err)
     }
 
@@ -1469,13 +1453,52 @@ func (g *Genomizer) CorrectByGrammaticalPaths(
             concreteInd.SetExhausted(true)  // Mark reduction failure
             
             // -- Debug --
-            log.Printf("CorrectByGrammaticalPaths: Fallback detected. LastValidPhenotype set and Exhausted marked.") 
+            // log.Printf("CorrectByGrammaticalPaths: Fallback detected. LastValidPhenotype set and Exhausted marked.") 
+
+            // --- EXIT IF EXHAUSTED ---
+            // No need to continue, because RebuildGenome will fail again.
+            return false, nil
         }
     
     }
 
-    // Update production history.
-    concreteInd.SetProductionHistory(productionSequence)
+    // Update production history ONLY if productionSequence is not empty.
+    if len(productionSequence) > 0 {
+        
+        // -- Debug --
+        log.Printf(
+            "[DEBUG] CorrectByGrammaticalPaths: Setting productionHistory to: %v (length: %d)",
+                productionSequence,
+                len(productionSequence),
+        )
+
+        concreteInd.SetProductionHistory(productionSequence)
+    } else {
+    
+        // -- Warning --
+        log.Printf("[WARNING] CorrectByGrammaticalPaths: productionSequence is empty. Skipping SetProductionHistory.")
+    
+        // Optional: Restore state if productionSequence is empty.
+        model.RestoreIndividualState(concreteInd, oldState)
+        return false, fmt.Errorf("empty production sequence")
+    }
+
+    // Validate the current state.
+    if !concreteInd.IsStateValid() {
+
+        // -- Debug --
+        log.Printf(
+            "[DEBUG] CorrectByGrammaticalPaths: State is INVALID after SetProductionHistory. Reason: Phenotype=%v, History=%v, Genome=%v, Exhausted=%v, LastValidPhenotype=%v",
+                concreteInd.GetPhenotype(),
+                concreteInd.GetProductionHistory(),
+                concreteInd.GetGenome(),
+                concreteInd.GetExhausted(),
+                concreteInd.GetLastValidPhenotype(),
+        )
+
+        model.RestoreIndividualState(concreteInd, oldState)
+        return false, fmt.Errorf("invalid state after correction")
+    }
 
     // Validate the correspondence between the generated phenotype and the 
     // initial phenotype.
@@ -1490,48 +1513,32 @@ func (g *Genomizer) CorrectByGrammaticalPaths(
     // -- Debug --
     // log.Println("CorrectByGrammaticalPaths: Phenotype validation: SUCCESS")
 
-    // -- Debug -- BEFORE RebuildGenome (current ncRNAs).
-    // log.Printf(
-    //     "CorrectByGrammaticalPaths: BEFORE RebuildGenome: NonCodingRNAs: %v, Stack: %v, Genome: %v",
-    //     concreteInd.GetDynamicRules(),
-    //     concreteInd.GetDynamicRuleStack(),
-    //     concreteInd.GetGenome(),
-    // )
-
     // Rebuild the genome and synthesize ncRNAs.
     if err := g.RebuildGenome(concreteInd, true); err != nil {  // usePhenotype = true
+        model.RestoreIndividualState(concreteInd, oldState)
         return false, fmt.Errorf("failed to rebuild genome after correction: %w", err)
     }
 
-    // -- Debug -- AFTER RebuildGenome (updated ncRNA).
-    log.Printf(
-        "CorrectByGrammaticalPaths: AFTER RebuildGenome: NonCodingRNAs: %v, Stack: %v, Genome: %v, Phenotype: %s",
-        concreteInd.GetDynamicRules(),
-        concreteInd.GetDynamicRuleStack(),
-        concreteInd.GetGenome(),
-        concreteInd.GetPhenotype(),
-    )    
+    // -- Debug --
+    if !concreteInd.IsStateValid() {
+        model.RestoreIndividualState(concreteInd, oldState)
+        return false, fmt.Errorf("invalid state after RebuildGenome")
+    }
 
     // Regenerate the phenotype and production history.
     if err := concreteInd.GeneratePhenotype(g); err != nil {
         
         // Restore the initial state in case of an error.
-        concreteInd.SetFitness(oldFitness)
-        concreteInd.SetPhenotype(oldPhenotype)
-        concreteInd.SetGenome(oldGenome)
-        concreteInd.SetExhausted(oldExhauted)
-        concreteInd.SetLastValidPhenotype(oldLastValidPhenotype)
-        concreteInd.SetProductionHistory(oldHistory)
+        model.RestoreIndividualState(concreteInd, oldState)
         
         return false, fmt.Errorf("failed to regenerate phenotype: %w", err)
     }
 
     // -- Debug --
-    // log.Printf("CorrectByGrammaticalPaths: phenotype after Genomize: %v\n, NonCodingRNAs: %v\n, Stack: %v\n", 
-    //     concreteInd.GetPhenotype(),
-    //     concreteInd.GetDynamicRules(),
-    //     concreteInd.GetDynamicRuleStack(),
-    // )    
+    if !concreteInd.IsStateValid() {
+        model.RestoreIndividualState(concreteInd, oldState)
+        return false, fmt.Errorf("invalid state after GeneratePhenotype")
+    }
 
     // -- Debug -- BEFORE CorrectByOptimalPaths.
     // log.Printf(
@@ -1543,38 +1550,29 @@ func (g *Genomizer) CorrectByGrammaticalPaths(
     if err := g.CorrectByOptimalPaths(concreteInd, fitnessThreshold); err != nil {
 
         // Restore the initial state in case of an error.
-        concreteInd.SetFitness(oldFitness)
-        concreteInd.SetPhenotype(oldPhenotype)
-        concreteInd.SetGenome(oldGenome)
-        concreteInd.SetExhausted(oldExhauted)
-        concreteInd.SetLastValidPhenotype(oldLastValidPhenotype)
-        concreteInd.SetProductionHistory(oldHistory)
+        model.RestoreIndividualState(concreteInd, oldState)
 
         return false, err
     }
 
-    // log.Printf(
-    //     "CorrectByGrammaiticalPaths: AFTER CorrectByOptimalPaths: Fitness: %f (old: %f)",
-    //     concreteInd.GetFitness(),
-    //     oldFitness,
-    // )
+    // -- Debug --
+    if !concreteInd.IsStateValid() {
+        model.RestoreIndividualState(concreteInd, oldState)
+        return false, fmt.Errorf("invalid state after CorrectByOptimalPaths")
+    }
 
     // Recalculate fitness after correction.
     if err := concreteInd.Evaluate(fitnessFunction); err != nil {
         
         // Restore the initial state in case of an error.
-        concreteInd.SetFitness(oldFitness)
-        concreteInd.SetPhenotype(oldPhenotype)
-        concreteInd.SetGenome(oldGenome)
-        concreteInd.SetExhausted(oldExhauted)
-        concreteInd.SetLastValidPhenotype(oldLastValidPhenotype)
-        concreteInd.SetProductionHistory(oldHistory)
-        
+        model.RestoreIndividualState(concreteInd, oldState)
+
         return false, fmt.Errorf("failed to recalculate fitness: %w", err)
     }
 
     // Check for improvement.
-    if concreteInd.GetFitness() > oldFitness {
+    // if concreteInd.GetFitness() > oldFitness {
+    if concreteInd.GetFitness() > oldState.GetFitness() {
         
         // -- Debug --
         // log.Println("CorrectByGrammaiticalPaths: Correction SUCCESS: Fitness improved")
@@ -1583,12 +1581,7 @@ func (g *Genomizer) CorrectByGrammaticalPaths(
     }
 
     // Restore the initial state if there is no improvement.
-    concreteInd.SetFitness(oldFitness)
-    concreteInd.SetPhenotype(oldPhenotype)
-    concreteInd.SetGenome(oldGenome)
-    concreteInd.SetExhausted(oldExhauted)
-    concreteInd.SetLastValidPhenotype(oldLastValidPhenotype) 
-    concreteInd.SetProductionHistory(oldHistory)
+    model.RestoreIndividualState(concreteInd, oldState)
 
     // -- Debug --
     // log.Println("CorrectByGrammaiticalPaths: Correction FAILED: No fitness improvement")
@@ -6191,8 +6184,8 @@ func (g *Genomizer) RebuildProductionSequenceFromPhenotype(
                 concreteInd.SetExhausted(true)  // Mark as exhausted
                 
                 // -- Debug --
-                log.Printf("RebuildProductionSequenceFromPhenotype: Individual exhausted. Fallback generated.")
-                log.Printf("RebuildProductionSequenceFromPhenotype: Last individual valid phenotype: %v", concreteInd.GetLastValidPhenotype())
+                // log.Printf("RebuildProductionSequenceFromPhenotype: Individual exhausted. Fallback generated.")
+                // log.Printf("RebuildProductionSequenceFromPhenotype: Last individual valid phenotype: %v", concreteInd.GetLastValidPhenotype())
             }
         
         }
@@ -6207,7 +6200,7 @@ func (g *Genomizer) RebuildProductionSequenceFromPhenotype(
         g.dynamicRuleStack = append(g.dynamicRuleStack, "FALLBACK_MARKER")
 
         // -- Debug --
-        log.Printf("RebuildProductionSequenceFromPhenotype: Fallback sequence generated: %v", fallbackSequence) 
+        // log.Printf("RebuildProductionSequenceFromPhenotype: Fallback sequence generated: %v", fallbackSequence) 
 
         // --- Store the original phenotype in LastValidPhenotype (in 
         //     CorrectByGrammaticalPaths) ---.
@@ -6378,7 +6371,7 @@ func (g *Genomizer) RepairIndividual(ind IIndividual) error {
         if !g.CanReduceToInitialSymbol(phenotypeStr, 20) {
             
             // -- Debug --
-            // log.Printf("RepairIndividual: Phenotype %q cannot be reduced to initial symbol. Skipping repair.", phenotypeStr)
+            log.Printf("RepairIndividual: Phenotype %q cannot be reduced to initial symbol. Skipping repair.", phenotypeStr)
 
             return nil
         }
@@ -6391,10 +6384,18 @@ func (g *Genomizer) RepairIndividual(ind IIndividual) error {
     oldPhenotype := concreteInd.GetPhenotype()
     oldHistory := utils.DeepCopyProductionHistory(concreteInd.GetProductionHistory())
     oldLastValidPhenotype := concreteInd.GetLastValidPhenotype()  // Preservation of immune memory
+    oldExhausted := concreteInd.GetExhausted()
 
     // -- Debug --
-    // log.Printf("RepairIndividual: INITIAL STATE - phenotype=%v, history=%v, genome=%v",
-    //     concreteInd.GetPhenotype(), concreteInd.GetProductionHistory(), concreteInd.GetGenome())
+    log.Printf("RepairIndividual: INITIAL STATE - ARNnc: %v, stack: %v, phenotype=%v, history=%v, genome=%v, last valid phenotype: %v, exhauted: %v",
+        concreteInd.GetDynamicRules(), 
+        concreteInd.GetDynamicRuleStack(),    
+        concreteInd.GetPhenotype(), 
+        concreteInd.GetProductionHistory(), 
+        concreteInd.GetGenome(),
+        concreteInd.GetLastValidPhenotype(),
+        concreteInd.GetExhausted(),
+    )
 
     // Restore the initial state in the event of an error or panic.
     success := false
@@ -6405,6 +6406,7 @@ func (g *Genomizer) RepairIndividual(ind IIndividual) error {
             concreteInd.SetPhenotype(oldPhenotype)
             concreteInd.SetProductionHistory(oldHistory)
             concreteInd.SetLastValidPhenotype(oldLastValidPhenotype)  // Restoration of immune memory
+            concreteInd.SetExhausted(oldExhausted)
         }
 
     }()
@@ -6414,7 +6416,7 @@ func (g *Genomizer) RepairIndividual(ind IIndividual) error {
     // -- Debug --
     log.Printf("RepairIndividual: history before Genomize n°1 %v", g.productionHistory)
     log.Printf("RepairIndividual: individual history before Genomize n°1 %v", ind.GetProductionHistory()) 
-    log.Printf("RepairIndividual: individual last valid phenotype before Genomize n°1 %v", ind.GetLastValidPhenotype())        
+    log.Printf("RepairIndividual: last individual valid phenotype before Genomize n°1 %v", ind.GetLastValidPhenotype())        
 
     if len(concreteInd.GetProductionHistory()) == 0 {
 
@@ -6869,7 +6871,10 @@ func (g *Genomizer) ValidatePhenotypeFromProductionSequence(
     expectedPhenotype string,
 ) error {
 
-    // Détecter si la séquence contient le marqueur START_RULE
+    // --- Detect if the sequence is a fallback ---
+    // A fallback is a minimal sequence such as [[grammar 1] [ε 0]] where 
+    // g.startRule is the fallback marker. By convention, Epsilon cancels 
+    // the entire derivation context.
     isFallback := false
     
     for _, prod := range productionSequence {

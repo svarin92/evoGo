@@ -63,7 +63,6 @@ func EvaluateFitness(
 //   (e.g., GenerationalReplacement).
 // - selectionFunc: Function to select parents (e.g., TournamentSelection).
 // - fitnessFunction: Function to evaluate the fitness of individuals.
-//
 // Returns:
 // - IIndividual: The best individual found after evolution.
 // - error: An error if evolution fails (e.g., empty population, invalid 
@@ -157,7 +156,10 @@ func SearchLoop(
 
     // Export the derivation to DOT format.
     if err := renderer.ExportToDOT(bestEver, "best_ever.dot"); err != nil {
+
+		// -- Error --
         log.Printf("Failed to export to DOT: %v", err)
+
     } else {
 		log.Printf("Successfully exported derivation to best_individual.dot")
 	}
@@ -261,8 +263,13 @@ func Step(
 	// generations.
     for i := range newIndividuals {
 
+		// -- Debug --
+		// log.Printf("Step: Individual phenotype: %v", newIndividuals[i].GetPhenotype())
+
         if err := newIndividuals[i].Repair(population.genomizer); err != nil {
-            log.Printf("Step: Repair impossible for individual %d after mutation: %v", i, err)
+            
+			// -- Warning --
+			log.Printf("Step: Repair impossible for individual %d after mutation: %v", i, err)
             
 			// Option: replace with a new random individual.
             newIndividuals[i] = model.NewIndividual(GenerateRandomGenome())
@@ -275,17 +282,6 @@ func Step(
 
         if err := ind.GeneratePhenotype(population.genomizer); err != nil {
             return nil, nil, fmt.Errorf("failed to generate phenotype: %w", err)
-        }
-
-    }	
-
-    // Repair after generation of the phenotype to correct inconsistencies in 
-	// the production history.
-    for i := range newIndividuals {
-
-        if err := newIndividuals[i].Repair(population.genomizer); err != nil {
-            log.Printf("Step: Repair impossible for individual %d after generation of the phenotype: %v", i, err)
-            newIndividuals[i] = model.NewIndividual(GenerateRandomGenome())
         }
 
     }
@@ -321,17 +317,24 @@ func Step(
 		if ind.GetFitness() < 1.0 {
    
 			// Apply the corrections in order.
-            if ind.GetFitness() > 0.5 {
+            if ind.GetFitness() > 0.0 {  // All "sick" individuals are treated
 
+				// (Non-coding RNAs): Rapid and adaptive response (such as 
+				// ncRNAs that regulate gene expression in real time).
                 if ok, err := population.CorrectByTemplate(ind, templateFunction, fitnessFunction); err != nil {
-                    log.Printf("Template fix failure:: %v", err)
+                    
+					// -- Error --
+					log.Printf("Template fix failure:: %v", err)
 
 					// Repair after failure (Context 2): if a correction (e.g., 
 					// CorrectByTemplate, CorrectGenome) fails or degrades 
 					// fitness, the individual may be in an inconsistent state. 
 					// A post-correction repair restores a valid state.
                 	if repairErr := newIndividuals[i].Repair(population.genomizer); repairErr != nil {
+
+						// -- Error --
                     	log.Printf("Failed to repair: %v", repairErr)
+						
                 	}
 
                 } else if ok {
@@ -345,25 +348,38 @@ func Step(
 			
             if ind.GetFitness() < 0.9 {
 
+				// (lymphocytes B/T): A global and systemic response (such as 
+				// lymphocytes eliminating entire cells if they are defective).
                 if ok, err := population.CorrectByGenome(ind, newIndividuals, 0.7, averageFitness, fitnessFunction); err != nil {
-                    log.Printf("Genome error: %v", err)
+            
+					// -- Error --
+					log.Printf("Step - After CorrectByGenome: Genome error: %v", err)
+
                 } else if ok {
                     newIndividuals[i] = ind
                 
 					if ind.GetFitness() >= 1.0 { continue }  // Move to the next individual if the target is reached
-                
 				}
 
             }
     		
- 			if ind.GetFitness() < 0.95 {
+			// Apply CorrectByGrammaticalPaths ONLY if Exhausted is false.
+            concreteInd, ok := ind.(*Individual)
+			
+ 			if ok && !concreteInd.GetExhausted() && ind.GetFitness() < 0.95 {
 
+				// (repair enzymes): Localized and targeted response to 
+				// structural motifs (such as site-specific DNA repair).
 				if ok, err := population.CorrectByGrammaticalPaths(ind, 0.8, fitnessFunction); err != nil {
-                    log.Printf("Grammatical error: %v", err)
-                } else if ok {
+
+					// -- Error --
+                    log.Printf("Step - After CorrectByGrammaticalPaths: Grammatical error: %v", err)
+                
+					concreteInd.SetExhausted(true)
+				} else if ok {
                     newIndividuals[i] = ind
                 }
-            
+
 			}			
 						
 		}
