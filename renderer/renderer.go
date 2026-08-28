@@ -72,6 +72,8 @@ func (r *Renderer) ExportToDOT(provider IProductionHistoryProvider, filename str
     
         nodeID++
         nodeMap[i] = nodeID
+
+        // Determine the style of the knot based on the first symbol.
         firstSymbol := production[0].GetText()
         isNonTerminal := true
 
@@ -104,52 +106,46 @@ func (r *Renderer) ExportToDOT(provider IProductionHistoryProvider, filename str
             nodeStyle += `, fillcolor=lightblue`  // Good fitness
         }
 
-        // Construct the node label.
-        var labelParts []string
+        // Write the node to the DOT file.
+        label := fmt.Sprintf("%s", firstSymbol)
 
-        for _, rule := range production {
-            symbol := rule.GetText()
-            
-            if _, isTerm := r.grammarProvider.GetSymbols()[symbol]; !isTerm {
-                symbol = "'" + symbol + "'"  // Quotation marks for terminals
-            }
-            
-            labelParts = append(labelParts, symbol)
+        if !isNonTerminal {
+            label = fmt.Sprintf("'%s'", firstSymbol)  // Add quotation marks for terminals.
         }
         
-        label := strings.Join(labelParts, " ")
+        _, err = fmt.Fprintf(file, "  %d [label=\"%s\", %s];\n", nodeID, label, nodeStyle)
         
-        // Add fitness to the label.
-        label += fmt.Sprintf(" (%.2f)", fitness)
-
-
-        // Write the node.
-        _, err = fmt.Fprintf(file, " node%d [label=\"%s\", %s];\n", nodeID, label, nodeStyle)
-    
         if err != nil {
             return err
         }
-        
+
     }
 
     // Write the edges between the nodes.
     for i := 0; i < len(productionHistory)-1; i++ {
-        _, err = fmt.Fprintf(file, " node%d -> node%d;\n", nodeMap[i], nodeMap[i+1])
-    
+
+        if len(productionHistory[i]) == 0 || len(productionHistory[i+1]) == 0 {
+            continue
+        }
+        
+        fromNode := nodeMap[i]
+        toNode := nodeMap[i+1]
+        _, err = fmt.Fprintf(file, "  %d -> %d;\n", fromNode, toNode)
+        
         if err != nil {
             return err
         }
-    
+
     }
 
-    // Write the DOT footer.
+    // Close the DOT graph.
     _, err = fmt.Fprintf(file, "}\n")
-
+    
     if err != nil {
         return err
     }
-    
-    return nil
+
+    return nil        
 }
 
 // Display a detailed report of potential or completed corrections to the 
@@ -265,27 +261,14 @@ func (r *Renderer) PrintGrammaticalDerivation(provider IProductionHistoryProvide
             continue
         }
 
-        // Determine if the first symbol is a terminal.
-        firstSymbol := production[0].GetText()
-        isNonTerminal := true
-
-        // Check if the symbol exists in g.symbols (via grammarProvider).
-        if _, exists := r.grammarProvider.GetSymbols()[firstSymbol]; !exists {
-            isNonTerminal = false  // Terminal
-        }
-
-        // Special cases for special terminals (eg: 'ε', '_').
-        if firstSymbol == "ε" || firstSymbol == "_" || strings.HasPrefix(firstSymbol, "'") {
-            isNonTerminal = false
-        }
-
         // Construct the output line.
         var symbols []string
         
         for _, rule := range production {
             symbol := rule.GetText()
 
-            if _, isTerm := r.grammarProvider.GetSymbols()[symbol]; !isTerm {
+            // Check if the symbol is a terminal (e.g., 'a', 'b', 'ε', '_').
+            if _, isTerm := r.grammarProvider.GetSymbols()[symbol]; !isTerm || symbol == "ε" || symbol == "_" || strings.HasPrefix(symbol, "'") {
                 
                 // Terminal: in green with quotation marks.
                 symbols = append(symbols, colorGreen+"'"+symbol+"'"+colorReset)
@@ -310,27 +293,6 @@ func (r *Renderer) PrintGrammaticalDerivation(provider IProductionHistoryProvide
                 line += colorYellow + " *" + colorReset // Correction marker
             }
         
-        }
-
-        // Error detection: a terminal should not have a derivation (len(production) > 1).
-        if !isNonTerminal && len(production) > 1 {
-        
-            // Check if this is a valid case for optimization.
-            isValidOptimization := false
-
-            if len(production) == 2 {
-                secondSymbol := production[1].GetText()
-            
-                if strings.HasSuffix(secondSymbol, "_tail") {
-                    isValidOptimization = true
-                }
-            
-            }
-
-            if !isValidOptimization {
-                line += colorRed + " [ERROR: Terminal with bypass]" + colorReset
-            }
-
         }
 
         fmt.Println(line)
