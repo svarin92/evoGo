@@ -2,10 +2,10 @@
 // Use of this source code is governed by the MIT license.
 // See the LICENSE file for details.
 //
-// The grammar package implements the evolving grammars for the Genomizer 
+// The grammar package implements the evolving grammars for the Genomizer
 // project.
-// This package contains the concrete implementations of the interfaces 
-// defined in `interfaces`, notably SpeciesGrammar, which represents a 
+// This package contains the concrete implementations of the interfaces
+// defined in `interfaces`, notably SpeciesGrammar, which represents a
 // grammar common to all individuals of a species.
 //
 // A grammar in this context is used to:
@@ -22,23 +22,24 @@ import (
 )
 
 // SpeciesGrammar represents a grammar common to all individuals of a species.
-// It implements the IGrammar interface and uses a parser (IParser) and a 
-// serializer (ISerializer) to load and process grammar rules from an EBNF 
+// It implements the IGrammar interface and uses a parser (IParser) and a
+// serializer (ISerializer) to load and process grammar rules from an EBNF
 // file.
 //
 // Fields:
 // - ast ebnf.Node: The abstract syntax tree (AST) of the parsed grammar.
-// - symbols map[string]interfaces.IRuleModel: The symbol map : 
+// - symbols map[string]interfaces.IRuleModel: The symbol map :
 //   (symbols → rules).
 // - context *kong.Context: The CLI context for error and option handling.
 // - parserFac interfaces.ParserFactory: Factory for creating an EBNF parser.
 // - reader io.Reader: The reader for the grammar's source file.
-// - serializer interfaces.ISerializer: The serializer to convert the AST 
+// - serializer interfaces.ISerializer: The serializer to convert the AST
 //   into usable rules.
 // - startRule string: The starting symbol of the grammar.
 type SpeciesGrammar struct {
 	ast 	   ebnf.Node
 	symbols    map[string]IRuleModel
+	terminals  map[string]bool
 	context    *kong.Context
 	parserFac  ParserFactory
 	reader     io.Reader
@@ -55,6 +56,7 @@ func (sg *SpeciesGrammar) Create(
 	reader io.Reader,
 ) *SpeciesGrammar {
 	sg.symbols = map[string]IRuleModel{}
+	sg.terminals = map[string]bool{}
 	sg.context = ctx
 	sg.parserFac = func() IParser { return NewParser() }
 	sg.reader = reader
@@ -103,11 +105,23 @@ func (sg *SpeciesGrammar) GetRules() map[string]IRuleModel {
     return sg.serializer.GetRules()
 }
 
-
 // GetStartRule returns the starting symbol of the grammar (e.g., "string").
 // This symbol is defined during serialization (via Segment()).
 func (sg *SpeciesGrammar) GetStartRule() string {
 	return sg.startRule
+}
+
+func (sg *SpeciesGrammar) GetTerminals() map[string]bool {
+
+    if sg.serializer == nil {
+        return nil
+    }
+    
+	return sg.serializer.GetTerminals()
+}
+
+func (sg *SpeciesGrammar) HasTerminal(terminal string) bool {
+    return sg.terminals[terminal]
 }
 
 // Parse uses the Parser to analyze the grammar file and build the AST. This 
@@ -140,9 +154,12 @@ func (sg *SpeciesGrammar) Segment() error {
 	}
 
 	sg.startRule = sg.serializer.GetStartRule()
-	
+    sg.terminals = sg.serializer.GetTerminals()  // Retrieves the terminals
+
 	// --Debug --
-	// log.Printf("Start rule: %s", sg.startRule)
+	// log.Printf("Segment: Symbols: %v", sg.symbols)
+	// log.Printf("Segment: Terminals: %v", sg.terminals)
+	// log.Printf("Segment: Start rule: %s", sg.startRule)
 	
 	return nil
 }

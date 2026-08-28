@@ -36,14 +36,28 @@ func NewOntology(individual IIndividual) *Ontology {
     return new(Ontology).Create(concreteInd)
 }
 
-// NewRuleModel creates a new RuleModel instance. Function exported to allow 
-// creation from other packages.
-func NewRuleModel(symbol string, symbolType SymbolType, rhs [][]IRuleModel) IRuleModel {
-    return &RuleModel{
+// NewRuleModel creates a new rule with an optional DerivationType. If 
+// DerivationType is not provided, HomogeneousDerivation is used by default.
+func NewRuleModel(
+    symbol string, 
+    symbolType SymbolType, 
+    rhs [][]IRuleModel,
+    derivationType ...DerivationType,  // Variadic parameter to make it optional
+) IRuleModel {
+    ruleModel := &RuleModel{
         Symbol:     symbol,
         SymbolType: symbolType,
         rhs:        rhs,  // the private rhs field is exported
+        count:      1,    // Default value
     }
+
+    if len(derivationType) > 0 {
+        ruleModel.derivationType = derivationType[0]
+    } else {
+        ruleModel.derivationType = HomogeneousDerivation  // By default
+    }
+
+    return ruleModel
 }
 
 func NewRuleModelWithCount(symbol string, symbolType SymbolType, count int) IRuleModel {
