@@ -15,6 +15,24 @@ const (
     NonTerminal SymbolType = 1
 )
 
+// DerivationType defines the type of derivation for a production rule.
+type DerivationType int
+
+const (
+
+	// RightDerivation: Production derives to the right (e.g., ["a" letter]).
+    // Terminal symbols are processed before non-terminals in the sequence.
+    RightDerivation DerivationType = iota
+
+    // LeftDerivation: Production derives to the left (e.g., [letter "b"]).
+    // Non-terminal symbols are processed before terminals in the sequence.
+    LeftDerivation
+
+    // HomogeneousDerivation: Production is homogeneous (all terminals or all 
+	// non-terminals).
+    HomogeneousDerivation
+)
+
 // ITextProvider is an interface for objects that provide text.
 type ITextProvider interface {
     GetText() string
@@ -57,6 +75,7 @@ type IRuleModel interface {
 	INotifiedModel
 	Clone() IRuleModel
 	GetCount() int
+	GetDerivationType() DerivationType
 	GetIdentifier() string
 	GetSymbols() [][]IRuleModel  // Returns the symbols (abstraction of rhs)
 	GetSymbolType() SymbolType 

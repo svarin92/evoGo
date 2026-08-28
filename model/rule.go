@@ -151,12 +151,13 @@ func (em *ExpressionModel) IsValid() bool {
 
 // RuleModel represents an EBNF grammar rule.
 type RuleModel struct {
-	NotifiedModel  				// NotifiedModel inheritance
+	NotifiedModel  				   // NotifiedModel inheritance
 	*ebnf.Production
-	count	   int				// Number of repetitions (e.g., 3 for [letter, letter, letter]).
-	Symbol     string
-	SymbolType SymbolType 		// Terminal or Non-Terminal.
-	rhs        [][]IRuleModel	// Represents the alternatives to the rule: syntagms or codons
+	count	       int             // Number of repetitions (e.g., 3 for [letter, letter, letter]).
+	derivationType DerivationType 
+	Symbol         string
+	SymbolType     SymbolType      // Terminal or Non-Terminal.
+	rhs            [][]IRuleModel  // Represents the alternatives to the rule: syntagms or codons
 }
 
 // CreateFrom initializes a RuleModel from an EBNF node.
@@ -213,6 +214,11 @@ func (rm *RuleModel) GetCount() int {
     return rm.count
 }
 
+// GetDerivationType returns the derivation type of the rule.
+func (rm *RuleModel) GetDerivationType() DerivationType {
+    return rm.derivationType
+}
+
 func (rm *RuleModel) GetIdentifier() string {
 	return rm.Production.Production
 }
@@ -238,6 +244,11 @@ func (rm *RuleModel) IsValid() bool {
 	}
 
 	return rm.Symbol != "" && (rm.SymbolType == 0 || rm.SymbolType == 1)
+}
+
+// SetDerivationType sets the derivation type of the rule.
+func (rm *RuleModel) SetDerivationType(derivation DerivationType) {
+    rm.derivationType = derivation
 }
 
 func (rm *RuleModel) SetSymbols(symbols [][]IRuleModel) {

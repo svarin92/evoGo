@@ -39,6 +39,8 @@ type IGrammar = interface {
 	// derivation.
 	GetStartRule() string
 
+	HasTerminal(terminal string) bool
+
 	// Segment parses and serializes the grammar from a given file or source.
 	// This method is called only once to initialize the grammar. It combines:
 	// 1. Parsing the EBNF file (via IParser).
