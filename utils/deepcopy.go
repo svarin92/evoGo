@@ -5,6 +5,17 @@ package utils
 
 import "evoGo/interfaces"
 
+// DeepCopyDynamicRules creates a deep copy of DynamicRules.
+func DeepCopyDynamicRules(rules map[string]interfaces.IRuleModel) map[string]interfaces.IRuleModel {
+    copiedRules := make(map[string]interfaces.IRuleModel, len(rules))
+
+    for k, v := range rules {
+        copiedRules[k] = v.Clone()
+    }
+    
+    return copiedRules
+}
+
 // DeepCopyProductionHistory performs a deep copy of production history.
 func DeepCopyProductionHistory(history [][]interfaces.IRuleModel) [][]interfaces.IRuleModel {
 
