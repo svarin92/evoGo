@@ -4,10 +4,11 @@
 package interfaces
 
 // ISuccessfulProduction defines the contract for a successful production.
+//
 // A successful production includes:
-// - The production itself (sequence of rules).
-// - Its fitness score.
-// - Its frequency of occurrence.
+//   - The production itself (sequence of rules).
+//   - Its fitness score.
+//   - Its frequency of occurrence.
 type ISuccessfulProduction interface {
     GetProduction() []IRuleModel  // Returns the output (e.g., []IRuleModel)
     GetFitness()    float64       // Return the associated fitness
