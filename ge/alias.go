@@ -6,6 +6,7 @@ package ge
 import (
 	"evoGo/config"
 	"evoGo/interfaces"
+	"evoGo/model"
 )
 
 // Aliases for functional types.
@@ -24,6 +25,11 @@ type (
 	IGenomizer     = interfaces.IGenomizer
 	IGrammar       = interfaces.IGrammar
 	IImmune        = interfaces.IImmune
+)
+
+// Alias ​​for concrete types.
+type (
+	Individual     = model.Individual
 )
 
 const (
