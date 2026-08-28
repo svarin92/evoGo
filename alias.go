@@ -14,6 +14,6 @@ type (
 )
 
 const (
-	GENERATIONS             = config.GENERATIONS
-	POPULATION_SIZE         = config.POPULATION_SIZE
+	GENERATIONS           = config.GENERATIONS
+	POPULATION_SIZE       = config.POPULATION_SIZE
 )
