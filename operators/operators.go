@@ -60,11 +60,13 @@ func Mutate(individuals []IIndividual, mutationProbability float64) []IIndividua
 	for _, ind := range individuals {
 
     	if len(ind.GetGenome()) != CODONS_SIZE {
-        	log.Printf("WARNING: Genome size is %d, expected %d\n", len(ind.GetGenome()), CODONS_SIZE)
+     
+			// -- Warning --
+			log.Printf("[WARNING] Genome size is %d, expected %d\n", len(ind.GetGenome()), CODONS_SIZE)
     	}
 
-		for i := range ind.GetGenome() {
 		// for i := 0; i < len(ind.genome); i++ {
+		for i := range ind.GetGenome() {
 
 			// For each codon in the genome, we draw a random number.
 			if rand.Float64() < mutationProbability {
@@ -148,6 +150,19 @@ func OnePointCrossover(parent0, parent1 IIndividual, withinUsed bool) (IIndividu
 		maxLen = len(parent1.GetGenome())
 	}
 
+	// Vérifier que maxLen > 0
+    if maxLen <= 0 {
+
+		// -- Warning --
+        log.Printf("[WARNING] OnePointCrossover: maxLen is %d (parent0.usedCodons=%d, parent1.usedCodons=%d, len(parent0.genome)=%d, len(parent1.genome)=%d). Returning copies of parents.",
+            maxLen, parent0.GetUsedCodons(), parent1.GetUsedCodons(), len(parent0.GetGenome()), len(parent1.GetGenome()))
+		
+		// -- Debug --	
+		// log.Printf("OnePointCrossover: parent0.phenotype = %v, parent1.phenotype = %v", parent0.GetPhenotype(), parent1.GetPhenotype())
+
+        return parent0.Copy(), parent1.Copy()
+    }
+
 	crossoverPoint := rand.Intn(maxLen)  // Cutoff point between 0 and maxLen-1
 
 	// Create children.
@@ -209,7 +224,7 @@ func OnePointCrossover(parent0, parent1 IIndividual, withinUsed bool) (IIndividu
 // worst player has a small chance of being selected.
 //
 // Returns a slice of references to the original individuals (no copies).
-//  Warning: The returned individuals must not be modified directly, as this 
+// Warning: The returned individuals must not be modified directly, as this 
 // would also affect the original population.
 func TournamentSelection(population []IIndividual, tournamentSize int) []IIndividual {
 
