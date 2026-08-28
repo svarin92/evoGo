@@ -8,8 +8,11 @@ package interfaces
 type IIndividual interface {
 	
 	// Getters to access the individual's properties.
+	GetDynamicRules() map[string]IRuleModel
+	GetDynamicRuleStack() []string
 	GetFitness() float64
 	GetGenome() []int
+	GetLastValidPhenotype() any
 	GetOldProductionFitness(key string) (float64, bool)	
 	GetOrganism() IOrganism
 	GetPhenotype() any
@@ -17,12 +20,15 @@ type IIndividual interface {
     GetUsedCodons() int
 
 	// Setters to modify properties (if necessary).
+	SetDynamicRules(map[string]IRuleModel)
+	SetDynamicRuleStack([]string)
     SetFitness(float64)
+	SetLastValidPhenotype(phenotype any)
     SetOrganism(IOrganism)
 	SetPhenotype(any)	
 	
-	// Copy creates a deep copy of the individual.
-	Copy() IIndividual
+	ClearDynamicRuleStack()
+	Copy() IIndividual  // Copy creates a deep copy of the individual
 	Evaluate(fitness FitnessFunc) error
     GeneratePhenotype(genomizer IGenomizer) error
 	MutateCodon(index int, newValue int)

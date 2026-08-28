@@ -125,9 +125,55 @@ func (e *Evaluator) ApplyNumericTemplate(phenotype float64, length int) float64 
 // ApplyStringTemplate corrects a string phenotype according to a template 
 // "CVCVCV".
 func (e *Evaluator) ApplyStringTemplate(phenotype, template, target string) string {
+
+	// -- Debug --
+	// log.Printf("ApplyStringTemplate: BEFORE: phenotype=%q (len=%d), template=%q (len=%d), target=%q (len=%d)\n",
+    //     phenotype, len(phenotype), template, len(template), target, len(target))
+
     corrected := []rune(phenotype)
     vowels := map[rune]bool{'a': true, 'e': true, 'i': true, 'o': true, 'u': true, 'y': true}
 
+    // Truncate or extend the phenotype so that it has the same length as the 
+	// target.
+    if len(corrected) > len(target) {
+
+		// -- Debug --
+		// log.Printf("ApplyStringTemplate: Truncating from len=%d to len=%d\n", len(corrected), len(target))
+
+        corrected = corrected[:len(target)]  // Truncate to the target length
+    } else if len(corrected) < len(template) {
+
+        // -- Debug --
+		// log.Printf("ApplyStringTemplate: Extending from len=%d to len=%d\n", len(corrected), len(target))
+
+        // Expand using the template to determine the character type (V or C).
+        for len(corrected) < len(target) {
+
+			if len(corrected) >= len(template) {
+
+                // If the template is shorter than the target, use a default 
+				// character (this case should not occur if the template is 
+				// generated from the target).
+                corrected = append(corrected, 'a')  // Default vowel
+            } else {
+                nextCharType := rune(template[len(corrected)])
+
+                if nextCharType == 'V' {
+                    corrected = append(corrected, 'a')  // Default vowel
+                } else {
+                    corrected = append(corrected, 'b')  // Default consonant
+                }
+            
+			}
+        
+		}
+
+    }
+
+	// -- Debug --
+	// log.Printf("ApplyStringTemplate: AFTER truncate/extend: corrected=%q (len=%d)\n", string(corrected), len(corrected))
+
+	// Apply corrections according to the template.
     for i, c := range template {
 
         if i >= len(corrected) || i >= len(target) {
@@ -150,6 +196,9 @@ func (e *Evaluator) ApplyStringTemplate(phenotype, template, target string) stri
 			// vowel, we replace it with the target letter.
             if !isCurrentCharVowel {
                 corrected[i] = targetChar
+
+				// -- Debug --
+				// log.Printf("ApplyStringTemplate: Replaced %c (consonant) with %c (vowel expected)\n", currentChar, targetChar)
             }
 
         case 'C':
@@ -158,11 +207,17 @@ func (e *Evaluator) ApplyStringTemplate(phenotype, template, target string) stri
 			// vowel, we replace it with the target letter.
             if isCurrentCharVowel {
                 corrected[i] = targetChar
+
+				// -- Debug --
+				// log.Printf("ApplyStringTemplate: Replaced %c (vowel) with %c (consonant expected)\n", currentChar, targetChar)
             }
 
         }	
 
 	}
+
+	// -- Debug --
+	// log.Printf("ApplyStringTemplate: FINAL: corrected=%q (len=%d)\n", string(corrected), len(corrected))
 
     return string(corrected)
 }
@@ -176,10 +231,13 @@ func (e *Evaluator) DoApplyNumericTemplate(model IOrganism) {
 	template, ok2 := model.GetTemplate().(int)
 
     if !ok1 || !ok2 {
+
+		// -- Error --
         log.Printf(
 			"Error: incompatible types (phenotype=%T, template=%T)\n",
             model.GetPhenotype(), model.GetTemplate(),
 		)
+
         return
     }	
     
@@ -199,10 +257,13 @@ func (e *Evaluator) DoApplyStringTemplate(model IOrganism) {
     template, ok2 := model.GetTemplate().(string)
 
     if !ok1 || !ok2 {
+
+		// -- Error --
         log.Printf(
 			"Error: incompatible types (phenotype=%T, template=%T)\n",
 			model.GetPhenotype(), model.GetTemplate(),
 		)
+
         return
     }
 
@@ -225,10 +286,13 @@ func (e *Evaluator) DoHandleNumericTemplate(model IOrganism) {
 	candidate, ok2 := utils.ToFloat64(model.GetPhenotype)
 
 	if !ok1 || !ok2 {
+
+		// -- Error --
 		log.Printf(
 			"Error: incompatible types for numeric template (target=%T, phenotype=%T)\n",
 			target, candidate,
 		)
+
 		return
 	}
 
@@ -249,10 +313,13 @@ func (e *Evaluator) DoHandleStringTemplate(model IOrganism) {
 	candidate, ok2 := model.GetPhenotype().(string)
 
 	if !ok1 || !ok2 {
+
+		// -- Error --
         log.Printf(
 			"Error: incompatible types for template string (target=%T, phenotype=%T)\n",
             e.target, model.GetPhenotype(),
 		)
+		
         return
     }
 
@@ -364,28 +431,121 @@ func (e *Evaluator) DoFormat(ind IIndividual) bool {
     organism := ind.GetOrganism()
 
     if organism == nil {
+
+		// -- Error --
         log.Printf("no organism associated with the individual\n")
+
         return false
     }
 
-    // 2. Retrieve the template visitor.
+    // -- Debug -- Log before applying the template.
+    // log.Printf(
+    //     "DoFormat: BEFORE Accept: organism phenotype=%q, len=%d\n",
+    //     organism.GetPhenotype(), len(organism.GetPhenotype().(string)),
+    // )
+
+    // 2. Retrieve the template visitor for the phenotype type.
     phenotypeType := reflect.TypeOf(ind.GetPhenotype())
 
     visitor, ok := e.templateVisitorTable[phenotypeType]
 
 	if !ok {
+
+		// -- Error --
         log.Printf("no template visitor for type %v\n", phenotypeType)
+
         return false
     }
+
+	// -- Debug -- Generate and display the template used
+    // target := e.target.(string)
+    // template := e.GenerateStringTemplate("", target)  // The target is used to generate the template
+    // log.Printf(
+    //     "DoFormat: Template for target %q: %q\n",
+    //     target, template,
+    // )
 
     // 3. Generate and apply the template via Accept.
     organism.Accept(visitor, func() IVisited { return organism })
 
+	// -- Debug -- Log of the phenotype after application.
+    // log.Printf(
+    //     "DoFormat: AFTER Accept: organism phenotype=%q, len=%d\n",
+    //     organism.GetPhenotype(), len(organism.GetPhenotype().(string)),
+    // )
+
 	// 4. Update the individual's phenotype (via the organism).
 	ind.SetPhenotype(organism.GetPhenotype())
 
+	// -- Debug --
+    // log.Printf(
+    //     "DoFormat AFTER SetPhenotype: individual phenotype=%q, len=%d\n",
+    //     ind.GetPhenotype(), len(ind.GetPhenotype().(string)),
+    // )
+
     // 5. Return true to indicate that the correction has been applied (but not yet evaluated).
     return true
+}
+
+func (e *Evaluator) DoNumericMatchWithPrecision(candidate, target float64, usedWraps int) float64 {
+
+    // 1. Special case: exact match.
+    if candidate == target {
+        return 1.0
+    }
+
+    // 2. Calculate the absolute distance (with increased penalty).
+    distance := math.Abs(target - candidate) * 2.0  // Factor of 2 to increase the penalty
+
+    // 3. Normalization.
+    maxDistance := math.Abs(target) + math.Abs(candidate)
+    
+	if maxDistance == 0 {
+        return 0.1  // Minimum threshold instead of 0.0
+    }
+    
+	normalizedDistance := distance / maxDistance
+    fitness := 1.0 - normalizedDistance
+
+    // 4. Bonus for matching digits (integer and decimal parts).
+    candidateStr := fmt.Sprintf("%.6f", candidate)
+    targetStr := fmt.Sprintf("%.6f", target)
+    positionBonus := 0.0
+    minLength := min(len(candidateStr), len(targetStr))
+    
+	for i := 0; i < minLength; i++ {
+    
+		if candidateStr[i] == targetStr[i] {
+            positionBonus += 0.05
+        }
+    
+	}
+    
+	fitness += positionBonus
+
+    // 5. Bonus for the integer part.
+    candidateIntPart := int64(candidate)
+    targetIntPart := int64(target)
+    
+	if candidateIntPart == targetIntPart {
+        fitness += 0.2  // Bonus for the integer part.
+    }
+
+    // 6. Plafond at 0.99 if not exact.
+    if fitness >= 1.0 && candidate != target {
+        fitness = 0.99
+    }
+
+    // 7. Minimum threshold at 0.1.
+    if fitness <= 0.0 {
+        fitness = 0.1
+    }
+
+    // 8. Wrap penalty.
+    wrapPenalty := config.WRAP_PENALTY_FACTOR * float64(usedWraps)
+    fitness = math.Max(0.1, fitness-wrapPenalty)  // Minimum threshold of 0.1
+
+    return fitness
 }
 
 func (e *Evaluator) DoNumericMatch(candidate, target float64, usedWraps int) float64 {
@@ -404,8 +564,8 @@ func (e *Evaluator) DoNumericMatch(candidate, target float64, usedWraps int) flo
 	//    we use the sum of the absolute values ​​as a reference.
 	maxDistance := math.Abs(target) + math.Abs(candidate)
 
-	if maxDistance == 0 {
-		return 0.0  // Avoid division by zero
+	if maxDistance == 0 {  // Avoid division by zero
+		return 0.1  // Minimum threshold of 0.1
 	}
 
 	// Normalize the distance to [0, 1].
@@ -421,7 +581,7 @@ func (e *Evaluator) DoNumericMatch(candidate, target float64, usedWraps int) flo
 	positionBonus := 0.0
 	minLength := min(len(candidateStr), len(targetStr))
 
-	for i := 0; i < minLength; i++ {
+	for i := range minLength {
 
 		if candidateStr[i] == targetStr[i] {
 			positionBonus += 0.05  // Bonus for each matching number
@@ -437,70 +597,122 @@ func (e *Evaluator) DoNumericMatch(candidate, target float64, usedWraps int) flo
 		fitness = 0.99
 	}
 
-	// 4. Linear penalty for wraps (as for strings).
+	// 4. Minimum threshold of 0.1.
+    if fitness <= 0.0 {
+        fitness = 0.1
+    }
+
+	// 5. Linear penalty for wraps (as for strings).
 	wrapPenalty := config.WRAP_PENALTY_FACTOR * float64(usedWraps)
-	fitness = math.Max(0, fitness-wrapPenalty)  // Fitness normalized between 0 and 1
+	fitness = math.Max(0.1, fitness-wrapPenalty)
 
 	return fitness
 }
 
 func (e *Evaluator) DoStringMatch(candidate, target string, usedWraps int) float64 {
 
+	// -- Debug --
+	// if candidate == "" {
+    //     log.Printf("DoStringMatch: empty candidate (target=%q)", target)
+    //     return 0.1
+    // }
+
+	// -- Debug --
+    // if len(candidate) != len(target) {
+	// 	log.Printf("DoStringMatch: length mismatch (candidate=%q, len=%d, target=%q, len=%d)",
+    //         candidate, len(candidate), target, len(target))
+    // }
+
 	// Special case: if the candidate is equal to the target, return 1.0 
 	// immediately.
-	if candidate == target {
-		return 1.0
-	}
+    if candidate == target {
+        return 1.0
+    }
 
-	// 1. Calculate the Levenshtein distance. Favors phenotypes close to 
-	//    "golden" even if they are not perfect.
-	distance := utils.LevenshteinDistance(candidate, target)
+	// Calculate the Levenshtein distance. Favors phenotypes close to 
+	// "golden" even if they are not perfect.
+    distance := utils.LevenshteinDistance(candidate, target)
 
-	targetLength := len(target)
-	candidateLength := len(candidate)
-
-	// 2. Penalize length deviations heavily. Ensures that phenotypes are the 
-	//    correct length.
+    targetLength := len(target)
+    candidateLength := len(candidate)
+    
+	// Penalize length deviations heavily. Ensures that phenotypes are the 
+	// correct length.
 	lengthDifference := int(math.Abs(float64(targetLength - candidateLength)))
-	distance += lengthDifference * 2  // Additional weight for length
+    distance += lengthDifference * 2
 
-	// 3. Normalize the distance to obtain a fitness score. The shorter the 
-	//    distance, the higher the fitness.
-	maxLength := max(candidateLength, targetLength)
+	if targetLength == 0 {
+        return 0.1  // Mininal threshold
+    }
+    
+	// Normalize the distance.
+	normalizedDistance := float64(distance) / float64(targetLength)						
+    baseFitness := 1.0 - normalizedDistance
 
-	if maxLength == 0 {
-		return 0.0
-	}
+	// Limit the baseFitness at 0.99 (because candidate != target).
+    if baseFitness >= 1.0 {
+        baseFitness = 0.99
+    }
 
-	// Normalize the distance to [0, 1].
-	fitness := 1.0 - (float64(distance) / float64(maxLength))
+	// Bonus for well-placed letters.
+    positionBonus := 0.0
 
-	// 4. Bonus for well-placed letters.
-	positionBonus := 0.0
-
-	for i := 0; i < min(len(candidate), len(target)); i++ {
-
+	for i := 0; i < min(targetLength, candidateLength); i++ {
+        
 		if candidate[i] == target[i] {
-			positionBonus += 0.05  // Increased bonus for well-placed letters
-		}
+            positionBonus += 0.05  
+        }
+
+    }
+
+	// Position penalty.
+    misplacedPenalty := 0.0
+
+	for i := 0; i < min(targetLength, candidateLength); i++ {
+
+		if candidate[i] != target[i] {
+            misplacedPenalty += 0.05
+        }
 
 	}
 
-	// Apply the bonus.
-	fitness += positionBonus
+    // Common letter bonus.    
+	targetLetters := make(map[rune]int)
 
-	// Limit fitness to 0.99 if not an exact match.
-	if fitness >= 1.0 && candidate != target {
-		fitness = 0.99
+	for _, char := range target {
+        targetLetters[char]++
+    }
+
+	commonLetters := 0
+
+	for _, char := range candidate {
+
+		if count, exists := targetLetters[char]; exists && count > 0 {
+            commonLetters++
+            targetLetters[char]--
+        }
+
 	}
 
-	// 5. Linear penalty for wraps.
-	wrapPenalty := config.WRAP_PENALTY_FACTOR * float64(usedWraps)
+	letterBonus := 0.0001 * float64(commonLetters)  // Plafond at 0.0001, otherwise delete
 
-	// Fitness normalized between 0 and 1 (1 = perfect match).
-	fitness = max(0, fitness-wrapPenalty)
+    fitness := baseFitness + positionBonus - misplacedPenalty + letterBonus
 
-	return fitness
+	// Strict plafond at 0.99 (because candidate != target).
+    if fitness >= 1.0 {
+        fitness = 0.99
+    }
+
+	// Minimum threshold of 0.1.
+    if fitness <= 0.0 {
+        fitness = 0.1
+    }
+
+	// Linear penalty for wraps.
+    wrapPenalty := config.WRAP_PENALTY_FACTOR * float64(usedWraps)
+    fitness = max(0, fitness-wrapPenalty)
+
+    return fitness
 }
 
 func (e *Evaluator) Evaluate(individual IIndividual) float64 {
@@ -536,18 +748,48 @@ func (e *Evaluator) GenerateStringTemplate(phenotype string, target string) stri
 	var template strings.Builder
     vowels := map[rune]bool{'a': true, 'e': true, 'i': true, 'o': true, 'u': true, 'y': true}
 
+	// -- Debug -- Input log: display the target and its length.
+    // log.Printf(
+    //     "GenerateStringTemplate: Target: %q (len=%d)\n",
+    //     target, len(target),
+    // )
+
     // Use the target to generate the template (e.g., "golden" → "CVCCVC").
-    for _, c := range target {
+    // for i, c := range target {
+	for _, c := range target {		
 
 		if c == '_' {
             template.WriteString("_")
+
+			// -- Debug --
+			// log.Printf("GenerateStringTemplate: Char %d: '%c' → '_'\n",
+            //     i, c,
+            // )
         } else if vowels[c] {
             template.WriteString("V")
+
+			// -- Debug --
+			// log.Printf("GenerateStringTemplate Char %d: '%c' (vowel) → 'V'\n",
+            //     i, c,
+            // )
         } else {
             template.WriteString("C")
+
+			// -- Debug --
+			// log.Printf(
+            //     "GenerateStringTemplate Char %d: '%c' (consonant) → 'C'\n",
+            //     i, c,
+            // )
         }
 
     }
+
+	// -- Debug -- Output log: display the generated template.
+    // finalTemplate := template.String()
+    // log.Printf(
+    //     "GenerateStringTemplate: Final template: %q (len=%d)\n",
+    //     finalTemplate, len(finalTemplate),
+    // )
 	
     return template.String()  // Example: "CVCCVC" for "golden"
 }
