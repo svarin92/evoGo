@@ -1466,11 +1466,11 @@ func (g *Genomizer) CorrectByGrammaticalPaths(
     if len(productionSequence) > 0 {
         
         // -- Debug --
-        log.Printf(
-            "[DEBUG] CorrectByGrammaticalPaths: Setting productionHistory to: %v (length: %d)",
-                productionSequence,
-                len(productionSequence),
-        )
+        // log.Printf(
+        //     "[DEBUG] CorrectByGrammaticalPaths: Setting productionHistory to: %v (length: %d)",
+        //         productionSequence,
+        //         len(productionSequence),
+        // )
 
         concreteInd.SetProductionHistory(productionSequence)
     } else {
@@ -1485,17 +1485,6 @@ func (g *Genomizer) CorrectByGrammaticalPaths(
 
     // Validate the current state.
     if !concreteInd.IsStateValid() {
-
-        // -- Debug --
-        log.Printf(
-            "[DEBUG] CorrectByGrammaticalPaths: State is INVALID after SetProductionHistory. Reason: Phenotype=%v, History=%v, Genome=%v, Exhausted=%v, LastValidPhenotype=%v",
-                concreteInd.GetPhenotype(),
-                concreteInd.GetProductionHistory(),
-                concreteInd.GetGenome(),
-                concreteInd.GetExhausted(),
-                concreteInd.GetLastValidPhenotype(),
-        )
-
         model.RestoreIndividualState(concreteInd, oldState)
         return false, fmt.Errorf("invalid state after correction")
     }
@@ -6352,12 +6341,34 @@ func (g *Genomizer) ReduceToInitialSymbol(
 // RepairIndividual repairs an individual whose genome or history is corrupted.
 func (g *Genomizer) RepairIndividual(ind IIndividual) error {
 
-    // 1. Realization of the individual.
+    // Realization of the individual.
     concreteInd, ok := ind.(*Individual)
 
     if !ok {
         return fmt.Errorf("RepairIndividual: individual is not *Individual")
     }
+
+    // Save the initial state.
+    oldState := model.SaveIndividualState(concreteInd)
+    defer func() {
+
+        // In case of panic, restore the state.
+        if r := recover(); r != nil {
+           model.RestoreIndividualState(concreteInd, oldState)
+        }
+    }()
+
+    // -- Debug --
+    // log.Printf(
+    //     "RepairIndividual: INITIAL STATE - ARNnc: %v, stack: %v, phenotype=%v, history=%v, genome=%v, last valid phenotype: %v, exhauted: %v",
+    //         concreteInd.GetDynamicRules(), 
+    //         concreteInd.GetDynamicRuleStack(),    
+    //         concreteInd.GetPhenotype(), 
+    //         concreteInd.GetProductionHistory(), 
+    //         concreteInd.GetGenome(),
+    //         concreteInd.GetLastValidPhenotype(),
+    //         concreteInd.GetExhausted(),
+    // )
 
     phenotype := concreteInd.GetPhenotype()
 
@@ -6365,72 +6376,58 @@ func (g *Genomizer) RepairIndividual(ind IIndividual) error {
         phenotypeStr, ok := phenotype.(string)
     
         if !ok {            
+            model.RestoreIndividualState(concreteInd, oldState)
             return fmt.Errorf("RepairIndividual: phenotype is not a string")
         }
     
         if !g.CanReduceToInitialSymbol(phenotypeStr, 20) {
             
+            // If the reduction fails, restore the initial state.
+            model.RestoreIndividualState(concreteInd, oldState)
+            
             // -- Debug --
-            log.Printf("RepairIndividual: Phenotype %q cannot be reduced to initial symbol. Skipping repair.", phenotypeStr)
+            // log.Printf("RepairIndividual: Phenotype %q cannot be reduced to initial symbol. Skipping repair.", phenotypeStr)
 
             return nil
         }
     
     }
 
-    // 2. Save the initial state for restoration in case of failure.
-    oldGenome := make([]int, len(concreteInd.GetGenome()))
-    copy(oldGenome, concreteInd.GetGenome())
-    oldPhenotype := concreteInd.GetPhenotype()
-    oldHistory := utils.DeepCopyProductionHistory(concreteInd.GetProductionHistory())
-    oldLastValidPhenotype := concreteInd.GetLastValidPhenotype()  // Preservation of immune memory
-    oldExhausted := concreteInd.GetExhausted()
+    // If the individual is abstract (without dynamic rules), copy them from the Genomizer.
+    if len(concreteInd.GetDynamicRules()) == 0 {
+
+        // Copy dynamic rules from the Genomizer to the individual.
+        concreteInd.SetDynamicRules(utils.DeepCopyMap(g.dynamicRules))
+
+    }
 
     // -- Debug --
-    log.Printf("RepairIndividual: INITIAL STATE - ARNnc: %v, stack: %v, phenotype=%v, history=%v, genome=%v, last valid phenotype: %v, exhauted: %v",
-        concreteInd.GetDynamicRules(), 
-        concreteInd.GetDynamicRuleStack(),    
-        concreteInd.GetPhenotype(), 
-        concreteInd.GetProductionHistory(), 
-        concreteInd.GetGenome(),
-        concreteInd.GetLastValidPhenotype(),
-        concreteInd.GetExhausted(),
-    )
+    // log.Printf("RepairIndividual: history before Genomize n°1 %v", g.productionHistory)
+    // log.Printf("RepairIndividual: individual history before Genomize n°1 %v", ind.GetProductionHistory()) 
+    // log.Printf("RepairIndividual: last individual valid phenotype before Genomize n°1 %v", ind.GetLastValidPhenotype())        
 
-    // Restore the initial state in the event of an error or panic.
-    success := false
-    defer func() {
-
-        if !success {
-            concreteInd.SetGenome(oldGenome)
-            concreteInd.SetPhenotype(oldPhenotype)
-            concreteInd.SetProductionHistory(oldHistory)
-            concreteInd.SetLastValidPhenotype(oldLastValidPhenotype)  // Restoration of immune memory
-            concreteInd.SetExhausted(oldExhausted)
-        }
-
-    }()
-
-    // 2. Check if productionHistory is empty.
-
-    // -- Debug --
-    log.Printf("RepairIndividual: history before Genomize n°1 %v", g.productionHistory)
-    log.Printf("RepairIndividual: individual history before Genomize n°1 %v", ind.GetProductionHistory()) 
-    log.Printf("RepairIndividual: last individual valid phenotype before Genomize n°1 %v", ind.GetLastValidPhenotype())        
-
+    // Check if productionHistory is empty.
     if len(concreteInd.GetProductionHistory()) == 0 {
 
         // Regenerate productionHistory from the genome.
         if err := g.Genomize(concreteInd.GetGenome(), concreteInd); err != nil {
+            model.RestoreIndividualState(concreteInd, oldState)
             return fmt.Errorf("unable to regenerate production history: %v", err)
         }
 
+        // Update the individual's phenotype and history.
         concreteInd.SetPhenotype(g.GetPhenotype())
         concreteInd.SetProductionHistory(utils.DeepCopyProductionHistory(g.GetProductionHistory()))
 
         // -- Debug --
         // log.Printf("RepairIndividual: history after Genomize n°1 %v", g.productionHistory)
         // log.Printf("RepairIndividual: individual history after Genomize n°1 %v", ind.GetProductionHistory())        
+    }
+
+    // -- Debug --
+    if !concreteInd.IsStateValid() {
+        model.RestoreIndividualState(concreteInd, oldState)
+        return fmt.Errorf("invalid state after Genomize (step 1)")
     }
 
     // 2. Check if the phenotype is valid.
@@ -6442,17 +6439,31 @@ func (g *Genomizer) RepairIndividual(ind IIndividual) error {
     // 3. Reconstruct the genome from the history or phenotype according to 
     //    isPhenotypeValid.
     if err := g.RebuildGenome(concreteInd, isPhenotypeValid); err != nil {
+        model.RestoreIndividualState(concreteInd, oldState)
         return fmt.Errorf("failed to rebuild genome: %v", err)
+    }
+
+    // Verification of state validity after RebuildGenome.
+    if !concreteInd.IsStateValid() {
+        model.RestoreIndividualState(concreteInd, oldState)
+        return fmt.Errorf("invalid state after RebuildGenome")
     }
    
     // -- Debug --
-    log.Printf("RepairIndividual: phenotype after RebuildGenome %v", ind.GetPhenotype())
-    log.Printf("RepairIndividual: history after RebuildGenome, Genomize n°2 %v", g.productionHistory)
-    log.Printf("RepairIndividual: individual history after RebuildGenome, Genomize n°2 %v", ind.GetProductionHistory())   
+    // log.Printf("RepairIndividual: phenotype after RebuildGenome %v", ind.GetPhenotype())
+    // log.Printf("RepairIndividual: history after RebuildGenome, Genomize n°2 %v", g.productionHistory)
+    // log.Printf("RepairIndividual: individual history after RebuildGenome, Genomize n°2 %v", ind.GetProductionHistory())   
 
-    // 4. Verify that the new genome generates a valid phenotype.
+    // Verify that the new genome generates a valid phenotype.
     if err := g.Genomize(concreteInd.GetGenome(), concreteInd); err != nil {
+        model.RestoreIndividualState(concreteInd, oldState)
         return fmt.Errorf("invalid repaired genome: %v", err)
+    }
+
+    // Verification of state validity after Genomize.
+    if !concreteInd.IsStateValid() {
+        model.RestoreIndividualState(concreteInd, oldState)
+        return fmt.Errorf("invalid state after Genomize (step 2)")
     }
 
     // 5. Update phenotype and history.
@@ -6468,16 +6479,28 @@ func (g *Genomizer) RepairIndividual(ind IIndividual) error {
 
         concreteInd.SetProductionHistory(utils.DeepCopyProductionHistory(g.GetProductionHistory()))
 
+        // Verification of state validity after updating the history.
+        if !concreteInd.IsStateValid() {
+            model.RestoreIndividualState(concreteInd, oldState)
+            return fmt.Errorf("invalid state after updating production history")
+        }
+
         // -- Debug --
         // log.Printf("RepairIndividual: individual history after Genomize n°3 %v", concreteInd.GetProductionHistory())
     }
 
     // 6. Check the final consistency.
     if concreteInd.GetPhenotype() == nil || concreteInd.GetPhenotype() == "" {
+        model.RestoreIndividualState(concreteInd, oldState)
         return fmt.Errorf("empty phenotype after repair")
     }
 
-    success = true
+    // Final check of the state's validity.
+    if !concreteInd.IsStateValid() {
+        model.RestoreIndividualState(concreteInd, oldState)
+        return fmt.Errorf("invalid final state after repair")
+    }
+
     return nil
 }
 

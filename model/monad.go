@@ -329,7 +329,7 @@ func (ind *Individual) IsStateValid() bool {
         
     }
 
-    log.Printf("[DEBUG] IsStateValid: PASSED")
+    // log.Printf("[DEBUG] IsStateValid: PASSED")
 
     return true
 }

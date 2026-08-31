@@ -263,9 +263,6 @@ func Step(
 	// generations.
     for i := range newIndividuals {
 
-		// -- Debug --
-		// log.Printf("Step: Individual phenotype: %v", newIndividuals[i].GetPhenotype())
-
         if err := newIndividuals[i].Repair(population.genomizer); err != nil {
             
 			// -- Warning --
