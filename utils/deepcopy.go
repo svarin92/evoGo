@@ -16,6 +16,16 @@ func DeepCopyDynamicRules(rules map[string]interfaces.IRuleModel) map[string]int
     return copiedRules
 }
 
+func DeepCopyMap(original map[string]interfaces.IRuleModel) map[string]interfaces.IRuleModel {
+    copy := make(map[string]interfaces.IRuleModel, len(original))
+
+    for k, v := range original {
+        copy[k] = v  // Assume that IRuleModel is copyable by value.
+    }
+    
+    return copy
+}
+
 // DeepCopyProductionHistory performs a deep copy of production history.
 func DeepCopyProductionHistory(history [][]interfaces.IRuleModel) [][]interfaces.IRuleModel {
 
@@ -35,4 +45,10 @@ func DeepCopyProductionHistory(history [][]interfaces.IRuleModel) [][]interfaces
     }
     
     return newHistory
+}
+
+func DeepCopyStringSlice(original []string) []string {
+    copiedSlice := make([]string, len(original))
+    copy(copiedSlice, original) 
+    return copiedSlice
 }
