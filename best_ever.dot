@@ -8,12 +8,12 @@ digraph Derivation {
   6 [label="consonant", shape=box, style=filled, fillcolor=lightblue, fillcolor=yellow];
   7 [label="vowel", shape=box, style=filled, fillcolor=lightblue, fillcolor=yellow];
   8 [label="consonant", shape=box, style=filled, fillcolor=lightblue, fillcolor=yellow];
-  9 [label="'g'", shape=ellipse, style=filled, fillcolor=lightgreen, fillcolor=orange];
+  9 [label="'g'", shape=ellipse, style=filled, fillcolor=lightgreen, fillcolor=yellow];
   10 [label="'o'", shape=ellipse, style=filled, fillcolor=lightgreen, fillcolor=yellow];
   11 [label="'l'", shape=ellipse, style=filled, fillcolor=lightgreen, fillcolor=yellow];
-  12 [label="'d'", shape=ellipse, style=filled, fillcolor=lightgreen, fillcolor=yellow];
+  12 [label="'d'", shape=ellipse, style=filled, fillcolor=lightgreen, fillcolor=orange];
   13 [label="'e'", shape=ellipse, style=filled, fillcolor=lightgreen, fillcolor=yellow];
-  14 [label="'n'", shape=ellipse, style=filled, fillcolor=lightgreen, fillcolor=orange];
+  14 [label="'n'", shape=ellipse, style=filled, fillcolor=lightgreen, fillcolor=yellow];
   1 -> 2;
   2 -> 3;
   3 -> 4;
