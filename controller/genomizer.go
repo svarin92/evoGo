@@ -65,10 +65,10 @@ type Genomizer struct {
     // (transient ncRNAs). Like snoRNAs or siRNAs, these ncRNAs are 
     // transient and used to regulate phenotype generation at a given 
     // moment. They follow a LIFO logic.
-    dynamicRuleStack  []string               // Stack for decoding
-	
+    dynamicRuleStack  []string  // Stack for decoding
+
     failedProductions []FailedProduction
-	historySize       int                    // History size
+	historySize       int       // History size
     PatternLibrary    *LinguisticPatternLibrary
 
 	// productionHistory represents the history of productions used to 
@@ -93,7 +93,7 @@ type Genomizer struct {
     // (for example, if the target changes).
 	recentSuccessfulProductions []SuccessfulProduction
 
-    reduceCache *lru.Cache  // LRU cache for CanReduceToInitialSymbol
+    reduceCache       *lru.Cache  // LRU cache for CanReduceToInitialSymbol
 
 	// Subset of "successful" productions that led to high-performing 
     // phenotypes (high fitness) and reusable to guide the future generation.
@@ -105,7 +105,7 @@ type Genomizer struct {
     // lists.
 	successfulProductions []SuccessfulProduction 
 
-    successfulGenomes     []SuccessfulGenome
+    successfulGenomes []SuccessfulGenome
 }
 
 func (g *Genomizer) Create(grammar IGrammar) *Genomizer {
@@ -130,8 +130,30 @@ func (g *Genomizer) Create(grammar IGrammar) *Genomizer {
 
     // Initialization of fields for non-coding RNAs.
     g.dynamicRules = make(map[string]IRuleModel)  // Map initialization
-    g.dynamicRuleStack = []string{}               // Stack initialization
+    
+    // Stack initialization /* with the default rule "ε" for -1 codons. */
+    g.dynamicRuleStack = []string{}
+
 	return g
+}
+
+// AddFallbackMarker adds FALLBACK_MARKER to dynamicRuleStack and dynamicRules.
+func (g *Genomizer) AddFallbackMarker() {
+
+    // Mark the failure in dynamicRuleStack.
+    g.dynamicRuleStack = append(g.dynamicRuleStack, "FALLBACK_MARKER")
+
+    // Check that FALLBACK_MARKER exists in dynamicRules.
+    if _, exists := g.dynamicRules["FALLBACK_MARKER"]; !exists {
+    
+        // Create a terminal rule for FALLBACK_MARKER.
+        g.dynamicRules["FALLBACK_MARKER"] = model.NewRuleModel(
+            "FALLBACK_MARKER",
+            Terminal,
+            [][]IRuleModel{},  // No production on the right-hand side for a terminal rule.
+        )
+    }
+
 }
 
 // AddFailedProductions adds a production to the failure list.
@@ -1182,7 +1204,7 @@ func (g *Genomizer) CanReduceToInitialSymbol(phenotype string, baseMaxDepth int)
     }
 
     // Try to reduce the phenotype with limited depth.
-    _, err := g.RebuildProductionSequence(phenotype, 20)
+    _, err := g.RebuildProductionSequence(phenotype, maxDepth)
     result := err == nil
 
     if g.reduceCache != nil {
@@ -1282,11 +1304,14 @@ func (g *Genomizer) CorrectByGenome(
     // )
 
     // Save the initial state.
-    oldFitness := concreteInd.GetFitness()
-    oldPhenotype := concreteInd.GetPhenotype()
-    oldGenome := make([]int, len(concreteInd.GetGenome()))
-    copy(oldGenome, concreteInd.GetGenome())
-    oldHistory := utils.DeepCopyProductionHistory(concreteInd.GetProductionHistory())
+    oldState := model.SaveIndividualState(concreteInd)
+    defer func() {
+
+        if r := recover(); r != nil {
+            model.RestoreIndividualState(concreteInd, oldState)
+        }
+
+    }()
 
     // Store the fitness of the productions before correction.
     for _, production := range concreteInd.GetProductionHistory() {
@@ -1299,9 +1324,42 @@ func (g *Genomizer) CorrectByGenome(
         return false, err
     }
 
+    if !concreteInd.IsStateValid() {
+        model.RestoreIndividualState(concreteInd, oldState)
+        return false, fmt.Errorf("invalid state after CorrectByOptimalPaths")
+    }
+    
     // Rebuild the genome and synthesize ncRNAs.
     if err := g.RebuildGenome(concreteInd, false); err != nil {
+        model.RestoreIndividualState(concreteInd, oldState)
         return false, fmt.Errorf("failed to rebuild genome after correction: %w", err)
+    }
+
+    // Validate the current state.
+    if !concreteInd.IsStateValid() {
+        model.RestoreIndividualState(concreteInd, oldState)
+        return false, fmt.Errorf("invalid state after correction")
+    }
+
+    // Check if a FALLBACK_MARKER has been added.
+    hasFallbackMarker := slices.Contains(g.dynamicRuleStack, "FALLBACK_MARKER")
+    
+    if hasFallbackMarker {
+    
+        // Restore the phenotype from immunological memory.
+        lastValidPhenotype := concreteInd.GetLastValidPhenotype()
+    
+        if lastValidPhenotype != nil && lastValidPhenotype != "" {
+            concreteInd.SetPhenotype(lastValidPhenotype)
+            concreteInd.SetExhausted(true)  // Mark as out of stock
+
+            // -- Debug --
+            log.Printf("CorrectByGenome: Fallback detected. LastValidPhenotype restored and Exhausted marked.")
+
+            // Stop processes.
+            return false, nil
+        }
+    
     }
 
     // -- Debug --
@@ -1314,12 +1372,14 @@ func (g *Genomizer) CorrectByGenome(
     if err := concreteInd.GeneratePhenotype(g); err != nil {
 
         // Restore the initial state in case of an error.
-        concreteInd.SetFitness(oldFitness)
-        concreteInd.SetPhenotype(oldPhenotype)
-        concreteInd.SetGenome(oldGenome)
-        concreteInd.SetProductionHistory(oldHistory)
+        model.RestoreIndividualState(concreteInd, oldState)
         
         return false, fmt.Errorf("failed to regenerate phenotype: %w", err)
+    }
+
+    if !concreteInd.IsStateValid() {
+        model.RestoreIndividualState(concreteInd, oldState)
+        return false, fmt.Errorf("invalid state after GeneratePhenotype")
     }
 
     // -- Debug --
@@ -1330,7 +1390,11 @@ func (g *Genomizer) CorrectByGenome(
 
     // Recalculate fitness.
     if err := concreteInd.Evaluate(fitnessFunction); err != nil {
-        return false, err
+        
+        // Restore the initial state in case of an error.
+        model.RestoreIndividualState(concreteInd, oldState)
+
+        return false, fmt.Errorf("failed to recalculate fitness: %w", err)
     }
 
     // -- Debug --
@@ -1340,7 +1404,7 @@ func (g *Genomizer) CorrectByGenome(
     // )    
 
     // Verify the improvement.
-    if concreteInd.GetFitness() > oldFitness {
+    if concreteInd.GetFitness() > oldState.GetFitness() {
 
         // -- Debug --
         // log.Printf("CorrectByGenome: SUCCESS: fitness improved from %v to %v\n", 
@@ -1352,10 +1416,7 @@ func (g *Genomizer) CorrectByGenome(
     }
 
     // Restore the initial state if there is no improvement.
-    concreteInd.SetFitness(oldFitness)
-    concreteInd.SetPhenotype(oldPhenotype)
-    concreteInd.SetGenome(oldGenome)
-    concreteInd.SetProductionHistory(oldHistory)
+    model.RestoreIndividualState(concreteInd, oldState)
 
     // -- Debug --
     // log.Printf("CorrectByGenome: FAILED: fitness not improved (restored old state)\n")
@@ -1411,6 +1472,7 @@ func (g *Genomizer) CorrectByGrammaticalPaths(
     oldState := model.SaveIndividualState(concreteInd)
 
     // Convert the phenotype to a string of characters.
+
     phenotypeStr, err := ConvertPhenotypeToString(concreteInd.GetPhenotype())
 
     if err != nil {
@@ -1809,7 +1871,7 @@ func (g *Genomizer) CorrectByTemplate(
     fitnessFunction FitnessFunc,
 ) (bool, error) {
 
-    // 1. Convert the individual and population parameters.
+    // Convert the individual and population parameters.
     concreteInd, ok := ind.(*Individual)
     
 	if !ok {
@@ -1823,11 +1885,14 @@ func (g *Genomizer) CorrectByTemplate(
     // )
 
     // 2. Save the initial state for restoration in case of failure.
-    oldFitness := concreteInd.GetFitness()
-    oldPhenotype := concreteInd.GetPhenotype()
-    oldGenome := make([]int, len(concreteInd.GetGenome()))
-    copy(oldGenome, concreteInd.GetGenome())
-    oldHistory := utils.DeepCopyProductionHistory(concreteInd.GetProductionHistory())
+    oldState := model.SaveIndividualState(concreteInd)
+    defer func() {
+
+        if r := recover(); r != nil {
+            model.RestoreIndividualState(concreteInd, oldState)
+        }
+        
+    }()
 
     // Store the fitness of the productions before correction.
     for _, production := range concreteInd.GetProductionHistory() {
@@ -1835,7 +1900,7 @@ func (g *Genomizer) CorrectByTemplate(
         concreteInd.SetOldProductionFitness(key, g.GetAverageFitness(production))
     }
 
-    // 3. Apply the correction using a template.
+    // Apply the correction using a template.
     if !templateFunction(concreteInd) {
 
         // -- Debug --
@@ -1850,8 +1915,8 @@ func (g *Genomizer) CorrectByTemplate(
     //     len(concreteInd.GetPhenotype().(string)),
     // )
 
-    // 4. Verify that the phenotype has been updated.
-    if concreteInd.GetPhenotype() == oldPhenotype {
+    // Verify that the phenotype has been updated.
+    if oldPhenotype := oldState.GetPhenotype(); oldPhenotype != nil && concreteInd.GetPhenotype() == oldPhenotype {
 
         // -- Warning --
         // log.Printf("CorrectByTemplate: Phenotype not updated by template function")
@@ -1859,8 +1924,9 @@ func (g *Genomizer) CorrectByTemplate(
         return false, nil
     }
 
-    // 5. Reconstruct the genome from the corrected phenotype.
+    // Reconstruct the genome from the corrected phenotype.
     if err := g.RebuildGenome(concreteInd, true); err != nil {
+        model.RestoreIndividualState(concreteInd, oldState)
         return false, fmt.Errorf("failed to rebuild genome: %w", err)
     }
 
@@ -1869,14 +1935,37 @@ func (g *Genomizer) CorrectByTemplate(
     //     concreteInd.GetPhenotype(), len(concreteInd.GetPhenotype().(string)),
     // )
 
-    // 6. Regenerate the phenotype and production history.
+    if !concreteInd.IsStateValid() {
+        model.RestoreIndividualState(concreteInd, oldState)
+        return false, fmt.Errorf("invalid state after CorrectByOptimalPaths")
+    }
+
+    // Check if a FALLBACK_MARKER has been added.
+    hasFallbackMarker := slices.Contains(g.dynamicRuleStack, "FALLBACK_MARKER")
+    
+    if hasFallbackMarker {
+    
+        // Restore the phenotype from immunological memory.
+        lastValidPhenotype := concreteInd.GetLastValidPhenotype()
+    
+        if lastValidPhenotype != nil && lastValidPhenotype != "" {
+            concreteInd.SetPhenotype(lastValidPhenotype)
+            concreteInd.SetExhausted(true)  // Mark as out of stock
+
+            // -- Debug --
+            log.Printf("CorrectByTemplate: Fallback detected. LastValidPhenotype restored and Exhausted marked.")
+
+            // Stop processes.
+            return false, nil
+        }
+    
+    }
+
+    // Regenerate the phenotype and production history.
     if err := concreteInd.GeneratePhenotype(g); err != nil {
 
         // Restore the initial state in case of an error.
-        concreteInd.SetFitness(oldFitness)
-        concreteInd.SetPhenotype(oldPhenotype)
-        concreteInd.SetGenome(oldGenome)
-        concreteInd.SetProductionHistory(oldHistory)
+        model.RestoreIndividualState(concreteInd, oldState)
 
         return false, fmt.Errorf("failed to regenerate phenotype: %w", err)
     }
@@ -1887,14 +1976,16 @@ func (g *Genomizer) CorrectByTemplate(
     //     len(concreteInd.GetPhenotype().(string)),
     // )
 
-    // 7. Recalculate fitness.
+    if !concreteInd.IsStateValid() {
+        model.RestoreIndividualState(concreteInd, oldState)
+        return false, fmt.Errorf("invalid state after CorrectByOptimalPaths")
+    }
+
+    // Recalculate fitness.
     if err := concreteInd.Evaluate(fitnessFunction); err != nil {
 
         // Restore the initial state in case of an error.
-        concreteInd.SetFitness(oldFitness)
-        concreteInd.SetPhenotype(oldPhenotype)
-        concreteInd.SetGenome(oldGenome)
-        concreteInd.SetProductionHistory(oldHistory)
+        model.RestoreIndividualState(concreteInd, oldState)
         
         return false, fmt.Errorf("failed to recalculate fitness: %w", err)
     }
@@ -1905,8 +1996,8 @@ func (g *Genomizer) CorrectByTemplate(
     //     concreteInd.GetFitness(),
     // )
 
-    // 8. Check for improvement.
-    if concreteInd.GetFitness() > oldFitness {
+    // Check for improvement.
+    if concreteInd.GetFitness() > oldState.GetFitness() {
 
         // -- Debug --
         // log.Printf("CorrectByTemplate: SUCCESS: fitness improved from %v to %v\n", 
@@ -1917,16 +2008,13 @@ func (g *Genomizer) CorrectByTemplate(
         return true, nil
     }
 
-    // 9. Restore the initial state if there is no improvement.
-    concreteInd.SetFitness(oldFitness)
-    concreteInd.SetPhenotype(oldPhenotype)
-    concreteInd.SetGenome(oldGenome)
-    concreteInd.SetProductionHistory(oldHistory)
+    // Restore the initial state if there is no improvement.
+    model.RestoreIndividualState(concreteInd, oldState)
 
     // -- Debug --
     // log.Printf("CorrectByTemplate: FAILED: fitness not improved (restored old state)\n")
 
-    // 10. No applicable template found.
+    // No applicable template found.
     return false, nil    
 }
 
@@ -2026,7 +2114,11 @@ func (g *Genomizer) DecodeCodonBlock(block []int) ([][]IRuleModel, error) {
         }
 
         // Apply the modulo to handle "out-of-bounds" codons.
-        codon = max(codon % len(rule.GetSymbols()), 0) 
+        if len(rule.GetSymbols()) == 0 {
+            return nil, fmt.Errorf("no symbols in rule for %q", currentSymbol)
+        }
+
+        codon = codon % len(rule.GetSymbols()) 
 
         // Select the corresponding production.
         production := rule.GetSymbols()[codon]
@@ -2059,6 +2151,13 @@ func (g *Genomizer) DecodeCodonBlock(block []int) ([][]IRuleModel, error) {
     return productions, nil
 }
 
+// DecodeCodonBlockWithDynamicRules decodes a block of codons into a 
+// sequence of productions. Handle non-coding RNAs (-1 marker) via the 
+// g.dynamicRuleStack, without modifying the overall state of the Genomizer. 
+// Dynamic rules are read from the stack without being consumed (since they 
+// can be reused elsewhere). Like a non-coding RNA that regulates gene 
+// expression without being immediately destroyed (it can be reused for 
+// multiple transcriptions).
 func (g *Genomizer) DecodeCodonBlockWithDynamicRules(block []int) ([][]IRuleModel, error) {
     g.usedCodons = 0  // Reset before the countdown
     codonIndex := 0
@@ -2082,6 +2181,10 @@ func (g *Genomizer) DecodeCodonBlockWithDynamicRules(block []int) ([][]IRuleMode
 
         // CHECK IF THE CURRENT CODON IS -1 (absolute priority).
         if codonIndex < len(block) && block[codonIndex] == -1 {
+
+            // -- Debug --
+            // log.Printf("DecodeCodonBlockWithDynamicRules: ARNs: %v", g.dynamicRules)
+            // log.Printf("DecodeCodonBlockWithDynamicRules: stack before pop: %v", g.dynamicRuleStack)
 
             if len(g.dynamicRuleStack) == 0 {
                 return nil, fmt.Errorf("no non-coding RNA in stack for codon -1 at position %d", codonIndex)
@@ -2137,11 +2240,11 @@ func (g *Genomizer) DecodeCodonBlockWithDynamicRules(block []int) ([][]IRuleMode
         // Initialize a counter for non-terminal symbols.
         nonTerminalCount := 0  // Reset to zero for each new one
 
-        // If the symbol is marked as derived, use the index stored in derivedSymbols.
+        // If the symbol is marked as derived, use the index stored in 
+        // derivedSymbols.
         if derivedSymbols[currentSymbol] {
 
             if g.currentRecursiveProduction != nil {
-
                 parentIndex, parentExists := parentCodonIndex[currentSymbol]
 
                 if parentExists && parentIndex+1 < len(block) && block[parentIndex+1] == -1 {
@@ -2219,7 +2322,11 @@ func (g *Genomizer) DecodeCodonBlockWithDynamicRules(block []int) ([][]IRuleMode
                 }
 
                 // Apply the modulo to handle "out-of-bounds" codons.
-                codon = max(codon % len(rule.GetSymbols()), 0)
+                if len(rule.GetSymbols()) == 0 {
+                    return nil, fmt.Errorf("no symbols in rule for %q", currentSymbol)
+                }
+
+                codon = codon % len(rule.GetSymbols())
                 production := rule.GetSymbols()[codon]
 
                 // Add production to the results.
@@ -2297,7 +2404,11 @@ func (g *Genomizer) DecodeCodonBlockWithDynamicRules(block []int) ([][]IRuleMode
 
         // Normal case: codon ≥ 0 (coding DNA).
         // Apply modulo to handle "out-of-bounds" codons.
-        codon = max(codon % len(rule.GetSymbols()), 0)
+        if len(rule.GetSymbols()) == 0 {
+            return nil, fmt.Errorf("no symbols in rule for %q", currentSymbol)
+        }
+
+        codon = codon % len(rule.GetSymbols())
 
         // Select the corresponding production.
         production := rule.GetSymbols()[codon]
@@ -2360,319 +2471,6 @@ func (g *Genomizer) DecodeCodonBlockWithDynamicRules(block []int) ([][]IRuleMode
     // -- Debug --
     // log.Printf("DecodeCodonBlockWithDynamicRules: Finished decoding. Final productions: %v, usedCodons: %d",
     //     productions, g.usedCodons)
-
-    return productions, nil
-}
-
-// DecodeCodonBlockWithDynamicRules decodes a block of codons into a 
-// sequence of productions. Handle non-coding RNAs (-1 marker) via the 
-// g.dynamicRuleStack, without modifying the overall state of the Genomizer. 
-// Dynamic rules are read from the stack without being consumed (since they 
-// can be reused elsewhere). Like a non-coding RNA that regulates gene 
-// expression without being immediately destroyed (it can be reused for 
-// multiple transcriptions).
-func (g *Genomizer) DecodeCodonBlockWithDynamicRules0(block []int) ([][]IRuleModel, error) {
-    g.usedCodons = 0  // Reset before the countdown
-    codonIndex := 0
-    currentSymbols := []string{g.startRule}
-    derivedSymbols := make(map[string]bool)
-    symbolOccurrences := make(map[string][]int)  // Stores the relative indices for each occurrence of a symbol
-    symbolRank  := make(map[string]int)
-    parentCodonIndex := make(map[string]int)  // Derived symbol → parent codon index
-    productions := [][]IRuleModel{}  
-
-    // -- Debug --
-    log.Printf("DecodeCodonBlockWithDynamicRules: Starting decoding for block: %v, startRule: %q, usedCodons: %d", 
-        block, g.startRule, g.usedCodons)
-
-    for len(currentSymbols) > 0 && codonIndex < len(block) {
-        currentSymbol := currentSymbols[0]
-        currentSymbols = currentSymbols[1:]
-
-        // -- Debug --
-        log.Printf("DecodeCodonBlockWithDynamicRules: Processing symbol: %q, codonIndex: %d, usedCodons: %d, remaining symbols %v", 
-            currentSymbol, codonIndex, g.usedCodons, currentSymbols)
-
-        // CHECK IF THE CURRENT CODON IS -1 (absolute priority).
-        if codonIndex < len(block) && block[codonIndex] == -1 {
-           
-            if len(g.dynamicRuleStack) == 0 {
-                return nil, fmt.Errorf("no non-coding RNA in stack for codon -1 at position %d", codonIndex)
-            }
-
-            // Retrieve the dynamic rule from the stack.
-            ruleName := g.dynamicRuleStack[len(g.dynamicRuleStack)-1]
-           
-            // -- Debug --
-            log.Printf("DecodeCodonBlockWithDynamicRules: Using non-coding RNA: %s (stack after pop: %v)",
-                ruleName, g.dynamicRuleStack)
-
-            rule, exists := g.dynamicRules[ruleName]
-           
-            if !exists {
-                return nil, fmt.Errorf("non-coding RNA rule %q not found", ruleName)
-            }
-
-            // Retrieve RNA production.
-            rnaProduction := rule.GetSymbols()[0]
-            productions = append(productions, rnaProduction)
-
-            // Remove ALL symbols from the recursive production of currentSymbols.
-            for _, sym := range g.currentRecursiveProduction {
-           
-                if len(currentSymbols) > 0 && currentSymbols[0] == sym.GetText() {
-                    currentSymbols = currentSymbols[1:]
-           
-                    // -- Debug --
-                    log.Printf("DecodeCodonBlockWithDynamicRules: Current symbols: %v", currentSymbols)
-                }
-           
-            }
-
-            // Add the RNA symbols to currentSymbols.
-            for _, symbol := range rnaProduction {
-                currentSymbols = append(currentSymbols, symbol.GetText())
-           
-                // -- Debug --
-                log.Printf("DecodeCodonBlockWithDynamicRules: Current symbols: %v", currentSymbols)
-            }
-
-            g.usedCodons++
-            codonIndex++  // Consumes the -1 marker
-           
-            // -- Debug --
-            log.Printf("DecodeCodonBlockWithDynamicRules: Consumed -1 marker (codonIndex now: %d, usedCodons remains: %d)",
-                codonIndex, g.usedCodons)
-           
-            continue  // Move to the next iteration
-        }
-
-        // Initialize a counter for non-terminal symbols.
-        nonTerminalCount := 0  // Reset to zero for each new one
-
-        // If the symbol is marked as derived, use the index stored in
-        // derivedSymbols.
-        if derivedSymbols[currentSymbol] {
-
-            if g.currentRecursiveProduction != nil {
-
-                parentIndex, parentExists := parentCodonIndex[currentSymbol]
-
-                if parentExists && parentIndex + 1 < len(block) && block[parentIndex + 1] == -1 {
-            
-                    // -- Debug --
-                    log.Printf(
-                        "DecodeCodonBlockWithDynamicRules: SKIPPING derived symbol %q (recursive production in progress and codon=-1 at parent index %d + 1)",
-                        currentSymbol,
-                        parentIndex,
-                    )
-            
-                    // Filter the current Symbols to retain only those not 
-                    // derived from recursive production.
-                    newSymbols := []string{}
-        
-                    for _, sym := range currentSymbols {
-        
-                        if !derivedSymbols[sym] {
-                            newSymbols = append(newSymbols, sym)
-                        }
-
-                    }
-        
-                    currentSymbols = newSymbols
-
-                    // Add "__MARKER__" only if currentSymbols is empty.
-                    if len(currentSymbols) == 0 {
-                        currentSymbols = append(currentSymbols, "__MARKER__")  // Dummy symbol to force the loop to continue
-                    }  
-
-                    // Restore codonIndex to the parent's index + 1.
-                    codonIndex = parentIndex + 1
-            
-                    log.Printf(
-                        "DecodeCodonBlockWithDynamicRules: Restored codonIndex to %d (parent index %d + 1) for %q",
-                            codonIndex,
-                            parentIndex,
-                            currentSymbol,
-                    )                
-                
-                    // Remove the derived symbol to prevent a re-attempt at processing.
-                    delete(derivedSymbols, currentSymbol)
-                    delete(symbolRank, currentSymbol)
-                    delete(parentCodonIndex, currentSymbol)
-
-                    continue
-                }
-
-            }
-        
-            // Use the codon following the parent's.
-            nextCodonIndex := symbolRank[currentSymbol] 
-        
-            if nextCodonIndex < len(block) {
-                codon := block[nextCodonIndex]
-
-                // -- Debug --
-                log.Printf("DecodeCodonBlockWithDynamicRules: Current codon: %d at new relative index %d, from absolute index %d", 
-                    codon, nextCodonIndex, codonIndex)
-                log.Printf("DecodeCodonBlockWithDynamicRules: Using codon index %d for derived symbol %q",
-                    nextCodonIndex, currentSymbol)
-
-                // Find the rule for the derived symbol.
-                rule, exists := g.GetSymbols()[currentSymbol]
-            
-                if !exists {
-                    continue  // Terminal symbol, ignore
-                }
-
-                // Apply the modulo to handle "out-of-bounds" codons.
-                codon = max(codon % len(rule.GetSymbols()), 0)
-                production := rule.GetSymbols()[codon]
-
-                // Add production to the results.
-                productions = append(productions, production)
-            
-                log.Printf("DecodeCodonBlockWithDynamicRules: Codon %d decoded to production by codon index %d: %v for symbol %q",
-                    codon, nextCodonIndex, production, currentSymbol)
-
-                // Increment usedCodons for this derivative production.
-                g.usedCodons++  // Increment usedCodons for each decoded production
-                
-                // Mark production symbols as derived with their adjusted index
-                // ONLY if the production is multi-symbol.
-                if len(production) > 1 {
-
-                    for rank, symbol := range production {
-
-                        // Check if the symbol has an associated rule (non-terminal).
-                        if _, symbolExists := g.GetSymbols()[symbol.GetText()]; symbolExists {
-                            currentSymbols = append(currentSymbols, symbol.GetText())
-                            derivedSymbols[symbol.GetText()] = true
-                            // Stocke l'index relatif pour cette occurrence spécifique
-                            symbolOccurrences[symbol.GetText()] = append(symbolOccurrences[symbol.GetText()], codonIndex + rank + 1)
-                            symbolRank[symbol.GetText()] = nextCodonIndex + rank + 1  // Update with the next available index
-                        }
-
-                        // Otherwise, ignore terminal symbols
-                    
-                    }
-
-                } else {
-
-                    // For single-symbol productions, simply add the symbol to currentSymbols.
-                    currentSymbols = append(currentSymbols, production[0].GetText())
-                }
-
-            }
-        
-            delete(derivedSymbols, currentSymbol)  // Remove the marker after processing
-            delete(symbolRank, currentSymbol)
-            continue  // Do not increment usedCodons or codonIndex
-        }
-
-        // Check if the current symbol has an associated rule (non-terminal).
-        rule, exists := g.GetSymbols()[currentSymbol]
-
-        if !exists {
-
-            // -- Debug --
-            // log.Printf("DecodeCodonBlockWithDynamicRules: Terminal symbol %q (no rule, it is not a codon)", currentSymbol)
-
-            // Terminal (no associated rule).
-            continue
-        }
-
-        // Non-terminal (rule exists): check that the codon is valid for this 
-        // rule.
-        if codonIndex >= len(block) {
-
-            // -- Debug --
-            // log.Printf("DecodeCodonBlockWithDynamicRules: No more codons to process (codonIndex=%d, block length=%d)",
-            //     codonIndex, len(block))
-
-            break
-        }
-
-        codon := block[codonIndex]
-
-        // -- Debug --
-        log.Printf("DecodeCodonBlockWithDynamicRules: Current codon: %d at index %d", codon, codonIndex)
-
-        // Normal case: codon ≥ 0 (coding DNA).
-        // Apply modulo to handle "out-of-bounds" codons.
-        codon = max(codon % len(rule.GetSymbols()), 0)
-
-        // Select the corresponding production.
-        production := rule.GetSymbols()[codon]
-
-        // -- Debug --
-        log.Printf("DecodeCodonBlockWithDynamicRules: Codon %d decoded to production by codon index %d: %v for symbol %q",
-            codon, codonIndex, production, currentSymbol)
-
-        // Add production to results.
-        productions = append(productions, production)
-
-        // -- Debug --
-        log.Printf("DecodeCodonBlockWithDynamicRules: Current productions: %v", productions)
-
-        // Store the current recursive production (if it contains _tail).
-        if HasTailSymbol(production) {
-            g.currentRecursiveProduction = production
-        } else {
-            g.currentRecursiveProduction = nil
-        }
-
-        // -- Debug --
-        // log.Printf("DecodeCodonBlockWithDynamicRules: Current recursive production: %v", g.currentRecursiveProduction)
-
-        // Mark production symbols as derived ONLY if it is a multi-symbol 
-        // production.
-        if len(production) > 1 {
-
-            nonTerminalRank := 0
-
-            // Add production symbols to currentSymbols (FIFO order).
-            for _, symbol := range production {
-
-                // Check if the symbol has an associated rule (non-terminal).
-                if _, symbolExists := g.GetSymbols()[symbol.GetText()]; symbolExists {
-
-                    currentSymbols = append(currentSymbols, symbol.GetText())
-                    derivedSymbols[symbol.GetText()] = true
-                    symbolRank[symbol.GetText()] = codonIndex + nonTerminalRank + 1  // rank starts at 0, so +1 to get the actual rank
-                    parentCodonIndex[symbol.GetText()] = codonIndex  // Store the index of the parent codon
-                    nonTerminalCount++  // Increment the counter for non-terminals
-                    nonTerminalRank++
-
-                    // -- Debug --
-                    log.Printf("DecodeCodonBlockWithDynamicRules: Current symbols: %v", currentSymbols)
-                }
-
-                // Otherwise, ignore terminal symbols
-
-            }
-
-            codonIndex = codonIndex + nonTerminalCount
-
-        } else {
-            
-            // For single-symbol productions, simply add the symbol to 
-            // currentSymbols.
-            currentSymbols = append(currentSymbols, production[0].GetText())
-        }
-
-        g.usedCodons++  // 1 codon = 1 production
-        codonIndex++    // Consumes a codon for this production
-        
-        // -- Debug --
-        log.Printf("DecodeCodonBlockWithDynamicRules: Consumed codon %d (usedCodons now: %d, codonIndex now: %d)", codon, g.usedCodons, codonIndex)
-    }
-
-    // -- Debug --
-    log.Printf("DecodeCodonBlockWithDynamicRules: Finished decoding. Final productions: %v, usedCodons: %d", productions, g.usedCodons)
-    
-    // -- Debug -- Check that the RNA stack isn't empty.
-    // log.Printf("DecodeCodonBlockWithDynamicRules: Dynamic rule stack at end: %v", g.dynamicRuleStack)
 
     return productions, nil
 }
@@ -3045,176 +2843,143 @@ func (g *Genomizer) EncodeProductionHistoryToCodons(history [][]IRuleModel) []in
 // symbols.
 //
 // Technical details:
-//   - Uses -1 markers in the genome to flag recursive expansions (ncRNA).
-//   - Maintains a dynamic rule stack (g.dynamicRuleStack) to track context 
-//     for these expansions.
-//   - Resets the stack (g.dynamicRuleStack = []string{}) at the start to 
-//     ensure transient behavior, mirroring the biological degradation of 
-//     ncRNA.
+// - Uses -1 markers in the genome to flag recursive expansions (ncRNA).
+// - Maintains a dynamic rule stack (g.dynamicRuleStack) to track context 
+//   for these expansions.
+// - Resets the stack (g.dynamicRuleStack = []string{}) at the start to 
+//   ensure transient behavior, mirroring the biological degradation of 
+//   ncRNA.
 //
 // Biological analogy:
-//   - Acts as an "RNA synthesizer": the grammar is DNA, the genome is mRNA + 
-//     ncRNA, and -1 markers are ncRNA-like regulators.
-//   - Recursive expansions (ncRNA) are not translated into terminal symbols 
-//     but regulate the derivation process, similar to how biological ncRNAs 
-//     (e.g., miRNA) regulate gene expression without encoding proteins.
+// - Acts as an "RNA synthesizer": the grammar is DNA, the genome is mRNA + 
+//   ncRNA, and -1 markers are ncRNA-like regulators.
+// - Recursive expansions (ncRNA) are not translated into terminal symbols 
+//   but regulate the derivation process, similar to how biological ncRNAs 
+//   (e.g., miRNA) regulate gene expression without encoding proteins.
 func (g *Genomizer) EncodeProductionHistoryToCodonsWithDynamicRules(history [][]IRuleModel) []int {
     genome := make([]int, 0)
 
-    // Get the start symbol (e.g., "grammar" or "string").
+    // Reset dynamicRules and dynamicRuleStack before processing.
+    g.dynamicRules = make(map[string]IRuleModel)
+    g.dynamicRuleStack = []string{}
+
+    // Get the initial symbol (e.g., "string" or "grammar").
     initialProduction, err := g.FindInitialProduction()
     initialSymbol := ""
-
+    
     if err == nil && len(initialProduction) > 0 {
         initialSymbol = strings.Split(initialProduction[0].GetText(), " ")[0]
-
+        
         // -- Debug --
         // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Initial symbol: %q", initialSymbol)
-    } else {
+    }
+
+    // Helper function to check if a production is a terminal occurrence of a 
+    // recursive rule. Returns (isTerminalOccurrence, recursiveProduction).
+    IsTerminalOccurrenceOfRecursiveProduction := func(production []IRuleModel) (bool, []IRuleModel) {
+    
+        if len(production) != 1 {
+            return false, nil
+        }
+    
+        symbol := production[0]
+        symbolText := strings.TrimSpace(strings.Split(symbol.GetText(), " ")[0])  // Ex: "letter"
+
+        // IGNORE TERMINAL SYMBOLS (e.g., [y 0]).
+        if symbol.GetSymbolType() == Terminal {
+
+            // -- Debug --
+            // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Skipping terminal symbol %q (type: Terminal)", symbolText)
+            
+            return false, nil
+        }
 
         // -- Debug --
-        // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: No initial symbol found")
+        // log.Printf(
+        //     "EncodeProductionHistoryToCodonsWithDynamicRules: Checking if %v is a terminal occurrence of a recursive production (symbolText=%q, type=NonTerminal)", 
+        //     production, symbolText,
+        // )
+
+        // Check if this symbol is the start of a recursive production in the grammar.
+        for _, rule := range g.GetSymbols() {
+    
+            for _, alt := range rule.GetSymbols() {
+    
+                if len(alt) > 1 {
+                    firstAltSymbol := alt[0]
+                    firstAltSymbolText := strings.TrimSpace(strings.Split(firstAltSymbol.GetText(), " ")[0])
+
+                    // -- Debug --
+                    // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Comparing with alternative %v (first symbol: %q)", alt, firstAltSymbolText)
+
+                    if firstAltSymbolText == symbolText {  // Ex: "letter" == "letter"
+    
+                        // Check if the alternative has a tail symbol (recursive).
+                        for _, sym := range alt[1:] {
+        
+                            if strings.Contains(sym.GetText(), "_tail") {
+
+                                // -- Debug --
+                                // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Found recursive production: %v (contains _tail)", alt)
+
+                                return true, alt  // Ex: [letter 1 string_tail 1]
+                            }
+        
+                        }
+        
+                    }
+        
+                }
+        
+            }
+        
+        }
+
+        // -- Debug --
+        // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Not a terminal occurrence of a recursive production")
+
+        return false, nil
     }
 
     for i, production := range history {
-        
+
         // -- Debug --
         // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Processing production[%d]: %v", i, production)
-
+        
+        // Skip empty productions.
         if len(production) == 0 {
 
             // -- Debug --
             // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Skipping empty production at index %d", i)
-            
+
             continue
         }
 
-        // Case 1: Production with a single symbol (terminal or non-terminal).
+        
+        // --- Handle terminal occurrences of recursive productions ---
         if len(production) == 1 {
-            symbol := production[0]
-            symbolText := strings.TrimSuffix(
-                strings.TrimSpace(strings.Split(symbol.GetText(), " ")[0]),
-                "_tail",
-            )
-            symbolType := symbol.GetSymbolType()
-            
-            // -- Debug --
-            // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Single symbol production - Text: %q, Type: %v", symbol.GetText(), symbolType)
+            isTerminalOccurrence, recursiveProduction := IsTerminalOccurrenceOfRecursiveProduction(production)
+         
+            if isTerminalOccurrence {
 
-            if symbolType == Terminal {
-                
                 // -- Debug --
-                // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Terminal symbol %q, finding parent...", symbolText)
-                
-                _, _, altIndex, found := g.FindTerminalIndexInParent(symbolText)
-                
-                if found {
-                
-                    // -- Debug --
-                    // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Terminal %q found in parent rule at index %d", symbolText, altIndex)
-                    
-                    genome = append(genome, altIndex)
-                } else {
-                    
-                    // -- Debug --
-                    // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: No parent found for terminal %q, using default codon 0", symbolText)
-                    
-                    genome = append(genome, 0)
-                }
+                // log.Printf(
+                //     "EncodeProductionHistoryToCodonsWithDynamicRules: Terminal occurrence detected! Transforming %v into %v + ARN regulator", 
+                //     production, recursiveProduction,
+                // )
 
-            } else {
-                
-                // -- Debug --
-                // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Non-terminal symbol %q", symbolText)
-                
-                if symbolText == initialSymbol {
-                    
-                    // -- Debug --
-                    // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Symbol %q is initial symbol, using codon 0", symbolText)
-                    
-                    genome = append(genome, 0)
-                } else {
-          
-                    // -- Debug --
-                    // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Finding parent for non-terminal %q...", symbolText)
-                    
-                    // -- Debug -- parentSymbol, _, altIndex, found := g.FindParentForNonTerminal(symbolText)
-                    _, _, altIndex, found := g.FindParentForNonTerminal(symbolText)
-                    
-                    if found {
-                    
-                        // -- Debug --
-                        // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Non-terminal %q found in parent rule %q at index %d",
-                        //     symbolText, parentSymbol, altIndex)
-                    
-                            genome = append(genome, altIndex)
-                    } else {
-                    
-                        // -- Debug --
-                        // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: No parent found for non-terminal %q, using default codon 0", symbolText)
-                    
-                        genome = append(genome, 0)
-                    }
-
-                }
-
-            }
-
-        } else {
-            
-            // Case 2: Production with multiple symbols.
-            isRecursiveProduction := HasTailSymbol(production)
-            
-            // -- Debug --
-            // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: isRecursiveProduction for %v: %v", production, isRecursiveProduction)
-
-            if isRecursiveProduction {
-                
-                // Case 2.1: Recursive production (e.g., [letter 1 string_tail 1]).
+                // Encode the full recursive production (e.g., [letter 1 string_tail 1]).
                 foundParent := false
                 
-                // -- Debug -- for parentSymbol, parentRule := range g.GetSymbols() {
                 for _, parentRule := range g.GetSymbols() {
-                
-                    // -- Debug --
-                    // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Checking parent rule %q for recursive production %v", parentSymbol, production)
                 
                     for altIndex, alt := range parentRule.GetSymbols() {
                 
-                        if len(alt) != len(production) {
-                            continue
-                        }
-
-                        // Compare the base symbols term by term (ignoring _tail).
-                        match := true
-                        
-                        for j := range alt {
-                            altSymbolName := strings.TrimSuffix(
-                                strings.TrimSpace(strings.Split(alt[j].GetText(), " ")[0]),
-                                "_tail",
-                            )
-                            prodSymbolName := strings.TrimSuffix(
-                                strings.TrimSpace(strings.Split(production[j].GetText(), " ")[0]),
-                                "_tail",
-                            )
+                        if reflect.DeepEqual(alt, recursiveProduction) {
 
                             // -- Debug --
-                            // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Comparing alt[%d] %q (base: %q) with prod[%d] %q (base: %q)",
-                            //     j, alt[j].GetText(), altSymbolName, j, production[j].GetText(), prodSymbolName)
+                            // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Encoding recursive production %v as codon %d", recursiveProduction, altIndex)
 
-                            if altSymbolName != prodSymbolName || alt[j].GetSymbolType() != production[j].GetSymbolType() {
-                                match = false
-                                break
-                            }
-
-                        }
-
-                        if match {
-                            
-                            // -- Debug --
-                            // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Production %v matches recursive alternative %v at index %d in rule %q",
-                            //     production, alt, altIndex, parentSymbol)
-                            
                             genome = append(genome, altIndex)
                             foundParent = true
                             break
@@ -3229,10 +2994,178 @@ func (g *Genomizer) EncodeProductionHistoryToCodonsWithDynamicRules(history [][]
                 }
 
                 if !foundParent {
+                    genome = append(genome, 0)  // Default codon if not found
+                }
+
+                // Add -1 for the regulator ARN (e.g., letter_exp).
+                genome = append(genome, -1)
+
+                // Add the regulator ARN to dynamicRules (e.g., "letter_exp").
+                baseSymbol := strings.TrimSpace(strings.Split(production[0].GetText(), " ")[0])
+                regulatorName := fmt.Sprintf("%s_exp", baseSymbol)  // Ex: "letter_exp"
+                
+                if _, exists := g.dynamicRules[regulatorName]; !exists {
+                    regulatorProduction := []IRuleModel{production[0]}  // Ex: [letter 1]
+                    g.dynamicRules[regulatorName] = model.NewRuleModel(
+                        regulatorName,
+                        NonTerminal,
+                        [][]IRuleModel{regulatorProduction},
+                    )
+
+                    // -- Debug --
+                    // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Added ARN regulator to dynamicRules: %q -> %v", regulatorName, regulatorProduction)
                     
+                }
+
+                g.dynamicRuleStack = append(g.dynamicRuleStack, regulatorName)
+                continue
+            }
+
+        }
+
+        // Case 1: Production with a single symbol (terminal or non-terminal).
+        if len(production) == 1 {
+            symbol := production[0]
+            symbolText := strings.TrimSuffix(
+                strings.TrimSpace(strings.Split(symbol.GetText(), " ")[0]),
+                "_tail",
+            )
+            symbolType := symbol.GetSymbolType()
+
+            // -- Debug --
+            // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Single symbol production - Text: %q, Type: %v", symbol.GetText(), symbolType)
+
+            if symbolType == Terminal {
+
+                // -- Debug --
+                // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Terminal symbol %q, finding parent...", symbolText)
+
+                _, _, altIndex, found := g.FindTerminalIndexInParent(symbolText)
+
+                if found {
+
+                    // -- Debug --
+                    // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Terminal %q found in parent rule at index %d", symbolText, altIndex)
+
+                    genome = append(genome, altIndex)
+                } else {
+
+                    // -- Debug --
+                    // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: No parent found for terminal %q, using default codon 0", symbolText)
+
+                    genome = append(genome, 0)
+                }
+
+            } else {
+
+                // -- Debug --
+                // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Non-terminal symbol %q", symbolText)
+
+                if symbolText == initialSymbol {
+
+                    // -- Debug --
+                    // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Symbol %q is initial symbol, using codon 0", symbolText)
+
+                    genome = append(genome, 0)
+                } else {
+
+                    // -- Debug --
+                    // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Finding parent for non-terminal %q...", symbolText)
+                    
+                    // -- Debug -- parentSymbol, _, altIndex, found := g.FindParentForNonTerminal(symbolText)
+                    _, _, altIndex, found := g.FindParentForNonTerminal(symbolText)
+
+                    if found {
+
+                        // -- Debug --
+                        // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Non-terminal %q found in parent rule %q at index %d",
+                        //     symbolText, parentSymbol, altIndex)
+                        
+                        genome = append(genome, altIndex)
+                    } else {
+
+                        // -- Debug --
+                        // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: No parent found for non-terminal %q, using default codon 0", symbolText)
+
+                        genome = append(genome, 0)
+                    }
+
+                }
+
+            }
+
+        } else {
+
+            // Case 2: Production with multiple symbols.
+            isRecursiveProduction := HasTailSymbol(production)
+            
+            // -- Debug --
+            // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: isRecursiveProduction for %v: %v", production, isRecursiveProduction)
+
+            if isRecursiveProduction {
+            
+                // Case 2.1: Recursive production (e.g., [letter 1 string_tail 1]).
+                foundParent := false
+
+                // -- Debug -- for parentSymbol, parentRule := range g.GetSymbols() {                
+                for _, parentRule := range g.GetSymbols() {
+
+                    // -- Debug --
+                    // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Checking parent rule %q for recursive production %v", parentSymbol, production)                    
+
+                    for altIndex, alt := range parentRule.GetSymbols() {
+            
+                        if len(alt) != len(production) {
+                            continue
+                        }
+                        // Compare the base symbols term by term (ignoring _tail).            
+                        match := true
+            
+                        for j := range alt {
+                            altSymbolName := strings.TrimSuffix(
+                                strings.TrimSpace(strings.Split(alt[j].GetText(), " ")[0]),
+                                "_tail",
+                            )
+                            prodSymbolName := strings.TrimSuffix(
+                                strings.TrimSpace(strings.Split(production[j].GetText(), " ")[0]),
+                                "_tail",
+                            )
+
+                            // -- Debug --
+                            // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Comparing alt[%d] %q (base: %q) with prod[%d] %q (base: %q)",
+                            //     j, alt[j].GetText(), altSymbolName, j, production[j].GetText(), prodSymbolName)
+                            
+                            if altSymbolName != prodSymbolName || alt[j].GetSymbolType() != production[j].GetSymbolType() {
+                                match = false
+                                break
+                            }
+            
+                        }
+            
+                        if match {
+
+                            // -- Debug --
+                            // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Production %v matches recursive alternative %v at index %d in rule %q",
+                            //     production, alt, altIndex, parentSymbol)
+
+                            genome = append(genome, altIndex)
+                            foundParent = true
+                            break
+                        }
+            
+                    }
+            
+                    if foundParent {
+                        break
+                    }
+            
+                }
+            
+                if !foundParent {
+
                     // -- Debug --
                     // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: No parent found for recursive production %v, using default codon 0", production)
-                    
+
                     genome = append(genome, 0)
                 }
 
@@ -3245,103 +3178,102 @@ func (g *Genomizer) EncodeProductionHistoryToCodonsWithDynamicRules(history [][]
                 
                 if i > 0 {
                     prevProduction := history[i-1]
-
+                
                     if HasTailSymbol(prevProduction) {
-
                         isRecursiveExpansion = IsReductionOf(prevProduction, production, g)
-                        
+
                         // -- Debug --
                         // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: isRecursiveExpansion for %v: %v", production, isRecursiveExpansion)
                     }
                 
                 }
-
-                if isRecursiveExpansion {  // Non-coding RNA: add a dynamic rule and encode -1
+                
+                if isRecursiveExpansion {  // Non-coding RNA: add a dynamic rule and encode -1.
                 
                     // Generate a unique name for the dynamic rule.
                     ruleName := GenerateDynamicRuleName(production)
-                    
+                
                     if _, exists := g.dynamicRules[ruleName]; !exists {
                         newRule := model.NewRuleModel(
-                            ruleName, 
-                            NonTerminal, 
+                            ruleName,
+                            NonTerminal,
                             [][]IRuleModel{production},
                         )
                         g.dynamicRules[ruleName] = newRule
-                    
+
                         // -- Debug --
                         // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Added dynamic rule %s -> %v", ruleName, production)
                     }
-
+                
                     // A non-coding RNA is non-coding by definition, but it is 
                     // used to regulate coding. The -1 marker is non-coding in 
                     // itself (it does not produce a terminal symbol), but it 
                     // triggers a recursive expansion (like a non-coding RNA 
                     // activating a gene).
-                    g.dynamicRuleStack = append(g.dynamicRuleStack, ruleName)  // Add ncRNA to stack
-                    genome = append(genome, -1)  // Marker for non-coding RNA
-                    
+                    g.dynamicRuleStack = append(g.dynamicRuleStack, ruleName)
+                    genome = append(genome, -1)
+
                     // -- Debug --
                     // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Production %v is a recursive expansion, encoded as dynamic rule %s", production, ruleName)
                 } else {
-
+                    
                     // Case 2.3: Direct production. (e.g., [letter 1 letter 1 
                     // letter 1] of [letters 1]).
                     foundParent := false
                     
-                    // -- Debug -- for parentSymbol, parentRule := range g.GetSymbols() {
+                    // -- Debug -- for parentSymbol, parentRule := range g.GetSymbols() {                    
                     for _, parentRule := range g.GetSymbols() {
-                    
+
                         // -- Debug --
                         // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Checking parent rule %q for production %v", parentSymbol, production)
-                    
+                        
                         for altIndex, alt := range parentRule.GetSymbols() {
-                            
+                    
                             if len(alt) != len(production) {
                                 continue
                             }
-
+                    
                             match := true
-                            
+                    
                             for j := range alt {
                                 altSymbolName := strings.TrimSpace(strings.Split(alt[j].GetText(), " ")[0])
                                 prodSymbolName := strings.TrimSpace(strings.Split(production[j].GetText(), " ")[0])
 
                                 // -- Debug --
                                 // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Comparing alt[%d] %q with prod[%d] %q",
-                                //     j, alt[j].GetText(), j, production[j].GetText())
+                                //     j, alt[j].GetText(), j, production[j].GetText())                                
 
                                 if altSymbolName != prodSymbolName || alt[j].GetSymbolType() != production[j].GetSymbolType() {
                                     match = false
                                     break
                                 }
-
+                    
                             }
-
+                    
                             if match {
-                                
+
                                 // -- Debug --
                                 // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Production %v matches direct alternative %v at index %d in rule %q",
                                 //     production, alt, altIndex, parentSymbol)
-                                
+
                                 genome = append(genome, altIndex)
                                 foundParent = true
                                 break
                             }
-
+                    
                         }
-
+                    
                         if foundParent {
                             break
                         }
-
+                    
                     }
-
+                    
                     if !foundParent {
-                        
+
                         // -- Debug --
                         // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: No parent found for production %v, using default codon 0", production)
-                        
+
                         genome = append(genome, 0)
                     }
 
@@ -3358,9 +3290,9 @@ func (g *Genomizer) EncodeProductionHistoryToCodonsWithDynamicRules(history [][]
     // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Dynamic rules: %v", g.dynamicRules)
     // log.Printf("EncodeProductionHistoryToCodonsWithDynamicRules: Dynamic rule stack at end: %v", g.dynamicRuleStack)
     // log.Fatal("EncodeProductionHistoryToCodonsWithDynamicRules: Forced stop at this location")
-    
+
     return genome
-}
+}    
 
 // EncodeProductionHistoryToGenome encodes a production history into a COMPLETE 
 // genome (adjusted to CODON_SIZE).
@@ -3513,14 +3445,50 @@ func (g *Genomizer) ExtractLinguisticPatterns(
     individual IIndividual,
 ) []LinguisticPattern {
 
+    // Sauvegarder une copie profonde de l'état actuel des ARNnc.
+    oldDynamicRules := utils.DeepCopyMap(g.dynamicRules)
+
+    // Restaurer et synchroniser à la fin de la fonction.
+    defer func() {
+
+        // Fusionner oldDynamicRules (ARNnc persistants) avec g.dynamicRules.
+        for ruleName, rule := range oldDynamicRules {
+
+            if _, exists := g.dynamicRules[ruleName]; !exists {
+                g.dynamicRules[ruleName] = rule
+            }
+
+        }
+
+        // Reconstruire dynamicRuleStack depuis dynamicRules.
+        ruleNames := make([]string, 0, len(g.dynamicRules))
+
+        for ruleName := range g.dynamicRules {
+            ruleNames = append(ruleNames, ruleName)
+        }
+
+        sort.Strings(ruleNames)
+        g.dynamicRuleStack = ruleNames
+    }()
+
+    /* 
     // Save the current ncRNAs from Genomizer.
     oldDynamicRules := g.dynamicRules
     defer func() {
+        validStack := make([]string, 0, len(g.dynamicRuleStack))
 
-        // Restore ncRNAs after use.
+        for _, ruleName := range g.dynamicRuleStack {
+        
+            if _, exists := g.dynamicRules[ruleName]; exists {
+                validStack = append(validStack, ruleName)
+            }
+
+        }
+
+        g.dynamicRuleStack = validStack
         g.dynamicRules = oldDynamicRules
     }()
-
+*/
     // Load ncRNAs from the individual.
     g.dynamicRules = individual.GetDynamicRules()
     g.dynamicRuleStack = individual.GetDynamicRuleStack()
@@ -3597,7 +3565,6 @@ func (g *Genomizer) ExtractLinguisticPatterns(
         // log.Printf("ExtractLinguisticPatterns: Block %v fitness=%.2f", block, fitness)
 
         // 5. Decode the block into grammatical productions.
-
         productionBlock, err := g.DecodeCodonBlockWithDynamicRules(block)
 
         if err != nil {
@@ -4272,7 +4239,7 @@ func (g *Genomizer) FindProductionSequenceForPhenotype(
         }
 
         // -- Debug --
-        log.Printf("FindProductionSequenceForPhenotype: currentSymbols %v", currentSymbols)
+        // log.Printf("FindProductionSequenceForPhenotype: currentSymbols %v", currentSymbols)
 
         if len(currentSymbols) == 0 {
             return nil, fmt.Errorf("no non-terminal symbol available to generate the phenotype")
@@ -4283,7 +4250,7 @@ func (g *Genomizer) FindProductionSequenceForPhenotype(
         for _, symbol := range currentSymbols {
 
             // -- Debug --
-            log.Printf("FindProductionSequenceForPhenotype: symbol %v", symbol)
+            // log.Printf("FindProductionSequenceForPhenotype: symbol %v", symbol)
 
             rule, exists := g.GetSymbols()[symbol]
         
@@ -4292,13 +4259,13 @@ func (g *Genomizer) FindProductionSequenceForPhenotype(
             }
 
             // -- Debug --
-            log.Printf("FindProductionSequenceForPhenotype: rule rhs %v", rule.GetSymbols())
+            // log.Printf("FindProductionSequenceForPhenotype: rule rhs %v", rule.GetSymbols())
 
             // Distinguishing between sequences and alternatives.
             for _, prod := range rule.GetSymbols() {
 
                 // -- Debug --
-                log.Printf("FindProductionSequenceForPhenotype: production %v, length %v", prod, len(prod))
+                // log.Printf("FindProductionSequenceForPhenotype: production %v, length %v", prod, len(prod))
         
                 if len(prod) > 1 {
         
@@ -4306,30 +4273,30 @@ func (g *Genomizer) FindProductionSequenceForPhenotype(
                     productionSequence = append(productionSequence, prod)
 
                     // -- Debug --
-                    log.Printf("FindProductionSequenceForPhenotype: production sequence for prod > 1 %v", productionSequence)
+                    // log.Printf("FindProductionSequenceForPhenotype: production sequence for prod > 1 %v", productionSequence)
         
                     for _, s := range prod {
                         nextSymbols = append(nextSymbols, s.GetText())
 
                         // -- Debug --
-                        log.Printf("FindProductionSequenceForPhenotype: nextSymbols sequence %v", nextSymbols)
+                        // log.Printf("FindProductionSequenceForPhenotype: nextSymbols sequence %v", nextSymbols)
                     }
         
                 } else if len(prod) == 1 {
 
                     // -- Debug --
-                    log.Printf("FindProductionSequenceForPhenotype: production sequence for prod = 1a %v", productionSequence)
+                    // log.Printf("FindProductionSequenceForPhenotype: production sequence for prod = 1a %v", productionSequence)
         
                     if index < len(target) {  // Index check
                         charStr := string(target[index])
 
                         // -- Debug --
-                        log.Printf("FindProductionSequenceForPhenotype: charStr %v", charStr)
+                        // log.Printf("FindProductionSequenceForPhenotype: charStr %v", charStr)
         
                         if prod[0].GetText() == charStr {
 
                             // -- Debug --
-                            log.Printf("FindProductionSequenceForPhenotype: production sequence for prod = 1b %v", productionSequence)
+                            // log.Printf("FindProductionSequenceForPhenotype: production sequence for prod = 1b %v", productionSequence)
         
                             // Add non-terminal production to the history.
                             productionSequence = append(productionSequence, []IRuleModel{
@@ -4360,7 +4327,7 @@ func (g *Genomizer) FindProductionSequenceForPhenotype(
                             nextSymbols = append(nextSymbols, chosenProd[0].GetText())
 
                             // -- Debug --
-                            log.Printf("FindProductionSequenceForPhenotype: nextSymbols alternative for prod = 1 %v", nextSymbols)
+                            // log.Printf("FindProductionSequenceForPhenotype: nextSymbols alternative for prod = 1 %v", nextSymbols)
 
                             break  // Breaking free from the loop after choosing an alternative
                         }
@@ -4382,7 +4349,8 @@ func (g *Genomizer) FindProductionSequenceForPhenotype(
         productionSequence = append(productionSequence, []IRuleModel{terminal})
     }
 
-    log.Printf("FindProductionSequenceForPhenotype: productionSequence %v", productionSequence)
+    // -- Debug --
+    // log.Printf("FindProductionSequenceForPhenotype: productionSequence %v", productionSequence)
 
     return productionSequence, nil
 }
@@ -4729,7 +4697,11 @@ func (g *Genomizer) Generate(
             }
 
             // Non-terminal: apply the modulo operation to the codon.
-            codon = max(codon % len(rule.GetSymbols()), 0)
+            if len(rule.GetSymbols()) == 0 {
+                return fmt.Errorf("no symbols in rule for %q", currentSymbol)
+            }
+
+            codon = codon % len(rule.GetSymbols())
 
             // Hybrid selection.
             var selectedProduction []IRuleModel
@@ -4946,6 +4918,7 @@ func (g *Genomizer) GenerateWithDynamicRules(
     
     // -- Debug -- Check that the RNA stack isn't empty.
     // log.Printf("GenerateWithDynamicRules: Dynamic rule stack at start: %v", g.dynamicRuleStack)
+    // log.Printf("GenerateWithDynamicRules: Dynamic rule at start: %v", g.dynamicRules)
 
     for wraps <= MAX_WRAPS && (!unexpandedSymbols.IsEmpty() || !pendingTerminals.IsEmpty()) {
 
@@ -4985,7 +4958,7 @@ func (g *Genomizer) GenerateWithDynamicRules(
 
                 if len(g.dynamicRuleStack) == 0 {
                     
-                    // -- debug --
+                    // -- Debug --
                     // log.Printf("GenerateWithDynamicRules: Ignoring codon -1 (no non-coding RNA in stack)")
                     
                     indexInput++  // Consume the -1 and continue
@@ -4993,7 +4966,7 @@ func (g *Genomizer) GenerateWithDynamicRules(
                 }
 
                 // Retrieve the dynamic rule from the stack.
-                ruleName := g.dynamicRuleStack[len(g.dynamicRuleStack)-1]
+                ruleName := g.dynamicRuleStack[len(g.dynamicRuleStack)-1]                
 
                 // ncRNAs are degraded after use; the stack is cleared after 
                 // each decoding/generation step.
@@ -5040,6 +5013,7 @@ func (g *Genomizer) GenerateWithDynamicRules(
                     
                                 // Do not put it back on, as it is the symbol to be removed.
                                 continue
+
                             } else {
                     
                                 // Otherwise, put it back on.
@@ -5064,7 +5038,11 @@ func (g *Genomizer) GenerateWithDynamicRules(
             // END OF NON-CODING RNA MANAGEMENT.
 
             // Existing code for codons ≥ 0.
-            codon = max(codon % len(rule.GetSymbols()), 0)
+            if len(rule.GetSymbols()) == 0 {
+                return fmt.Errorf("no symbols in rule for %q", currentSymbol)
+            }
+
+            codon = codon % len(rule.GetSymbols())
             randomValue := rand.Float64()
             var selectedProduction []IRuleModel
 
@@ -5236,12 +5214,49 @@ func (g *Genomizer) Genomize(genome []int, individual IIndividual) error {
     g.mu.Lock()
     defer g.mu.Unlock()
 
+    // Sauvegarder l'état initial de dynamicRules (pour fusionner les ARNnc persistants).
+    oldDynamicRules := utils.DeepCopyMap(g.dynamicRules)
+
+    defer func() {
+        
+        // Fusionner oldDynamicRules (ARNnc persistants) avec g.dynamicRules.
+        for ruleName, rule := range oldDynamicRules {
+        
+            if _, exists := g.dynamicRules[ruleName]; !exists {
+                g.dynamicRules[ruleName] = rule
+            }
+        
+        }
+
+        // Reconstruire dynamicRuleStack depuis dynamicRules.
+        ruleNames := make([]string, 0, len(g.dynamicRules))
+        
+        for ruleName := range g.dynamicRules {
+            ruleNames = append(ruleNames, ruleName)
+        }
+        
+        sort.Strings(ruleNames)
+        g.dynamicRuleStack = ruleNames
+    }()
+
+/*
     // Save only dynamicRules (not the stack).
     oldDynamicRules := g.dynamicRules
     defer func() {
+        validStack := make([]string, 0, len(g.dynamicRuleStack))
+
+        for _, ruleName := range g.dynamicRuleStack {
+        
+            if _, exists := g.dynamicRules[ruleName]; exists {
+                validStack = append(validStack, ruleName)
+            }
+
+        }
+
+        g.dynamicRuleStack = validStack
         g.dynamicRules = oldDynamicRules
-        // Do not restore g.dynamicRuleStack (transient)
     }()
+*/
 
     // Load ncRNAs from the individual.
     g.dynamicRules = individual.GetDynamicRules()
@@ -5280,13 +5295,13 @@ func (g *Genomizer) Genomize(genome []int, individual IIndividual) error {
     }
 
     // Decoding with loaded ncRNAs:
-    // → Retrieves the COMPLETE history (with recursive expansions).
+    // → Retrieves the COMPLETE history (with recursive expansions).        
     productions, err := g.DecodeCodonBlockWithDynamicRules(genome)
 
     if err != nil {
 
         // -- Error --
-        log.Printf("Failed to decode genome: %v", err)
+        log.Printf("Genemize fails to decode genome: %v", err)
         
         return err
     }
@@ -5392,8 +5407,8 @@ func (g *Genomizer) GenomizeFromStringPhenotype(phenotypeStr string) error {
     
     // -- Debug -- Check the reconstruction.
     // log.Printf("GenomizeFromStringPhenotype: phenotype=%s, history %v", 
-    //      phenotypeStr, 
-    //      g.productionHistory,
+    //     phenotypeStr, 
+    //     g.productionHistory,
     // )
 
     // -- Debug -- Also check the phenotype generated from this history.
@@ -5828,9 +5843,9 @@ func (g *Genomizer) ProductionSimilarity(p1, p2 []IRuleModel) float64 {
 }
 
 // RebuildGenome reconstructs an individual's genome from either:
-//   - The phenotype (explicit history via GenomizeFromPhenotype), or
-//   - The production history (implicit history, preprocessed to explicit 
-//     recursive expansions via ExplicitFactorizableSequences).
+// - The phenotype (explicit history via GenomizeFromPhenotype), or
+// - The production history (implicit history, preprocessed to explicit 
+//   recursive expansions via ExplicitFactorizableSequences).
 //
 // In both cases, it ensures individual.history is synchronized with the 
 // encoded history. The genome is then generated, and the individual's 
@@ -5850,11 +5865,27 @@ func (g *Genomizer) RebuildGenome(individual *Individual, usePhenotype bool) err
 
     if usePhenotype {
     
-        // 1. Reconstruct from the phenotype (RebuildGenomeFromPhenotype 
+        // Reconstruct from the phenotype (RebuildGenomeFromPhenotype 
         //    approach).
-        if individual.GetPhenotype() == nil || individual.GetPhenotype() == "" {
-            return fmt.Errorf("empty or invalid phenotype")
-        }
+        // if individual.GetPhenotype() == nil || individual.GetPhenotype() == "" {
+        //     return fmt.Errorf("empty or invalid phenotype")
+        // }
+
+        phenotype := individual.GetPhenotype().(string)
+
+        // Check if the reduction is possible.
+        if !g.CanReduceToInitialSymbol(phenotype, 20) {
+
+            // Mark the individual as exhausted and preserve the phenotype.
+            individual.SetLastValidPhenotype(phenotype)  // Save the original phenotype
+            individual.SetExhausted(true)  // Mark as exhausted
+            g.dynamicRuleStack = append(g.dynamicRuleStack, "FALLBACK_MARKER")  // Mark the failure in dynamicRuleStack.
+
+            // -- Debug --
+            // log.Printf("RebuildGenome: Phenotype %q cannot be reduced. Marked as exhausted.", phenotype)
+            
+            return nil  // Exit without errors.
+        }        
 
         // Generate productionHistory from the phenotype.
         if err := g.GenomizeFromPhenotype(individual.GetPhenotype()); err != nil {
@@ -5909,6 +5940,12 @@ func (g *Genomizer) RebuildGenome(individual *Individual, usePhenotype bool) err
     if err := g.Genomize(individual.GetGenome(), individual); err != nil {
         return fmt.Errorf("failed to regenerate phenotype: %w", err)
     }
+
+    // -- Debug --
+    // log.Printf("RebuildGenome - Genomize: g.dynamicRules: %v", g.dynamicRules)
+    // log.Printf("RebuildGenome - Genomize: g.dynamicRuleStack: %v", g.dynamicRuleStack)
+    // log.Printf("RebuildGenome - Genomize: individual.DynamicRules: %v", individual.GetDynamicRules())
+    // log.Printf("RebuildGenome - Genomize: individual.DynamicRuleStack: %v", individual.GetDynamicRuleStack())
 
     // -- Debug --
     // log.Printf("RebuildGenome: After Genomize - g.phenotype=%v, g.history=%v",
@@ -6141,17 +6178,47 @@ func (g *Genomizer) RebuildProductionSequenceFromPhenotype(
 
     // --- Save a DEEP COPY of the current state of the ncRNAs ---
     // Deep copy of dynamicRules (map)
-    oldDynamicRules := make(map[string]IRuleModel, len(g.dynamicRules))
+    oldDynamicRules := utils.DeepCopyMap(g.dynamicRules)
 
-    for k, v := range g.dynamicRules {
-
-        // Clone each IRuleModel in the map.
-        oldDynamicRules[k] = v.Clone()
-    }
-
+/*    
     // Restore the initial state at the end of the function.
     defer func() {
+        validStack := make([]string, 0, len(g.dynamicRuleStack))
+
+        for _, ruleName := range g.dynamicRuleStack {
+        
+            if _, exists := g.dynamicRules[ruleName]; exists {
+                validStack = append(validStack, ruleName)
+            }
+
+        }
+
+        g.dynamicRuleStack = validStack
         g.dynamicRules = oldDynamicRules
+    }()
+*/
+
+    // Restaurer et synchroniser à la fin de la fonction.
+    defer func() {
+        
+        // Fusionner oldDynamicRules (ARNnc persistants) avec g.dynamicRules.
+        for ruleName, rule := range oldDynamicRules {
+        
+            if _, exists := g.dynamicRules[ruleName]; !exists {
+                g.dynamicRules[ruleName] = rule
+            }
+        
+        }
+
+        // Reconstruire dynamicRuleStack depuis dynamicRules.
+        ruleNames := make([]string, 0, len(g.dynamicRules))
+        
+        for ruleName := range g.dynamicRules {
+            ruleNames = append(ruleNames, ruleName)
+        }
+        
+        sort.Strings(ruleNames)
+        g.dynamicRuleStack = ruleNames
     }()
 
     // -- Debug --
@@ -6179,14 +6246,13 @@ func (g *Genomizer) RebuildProductionSequenceFromPhenotype(
         
         }
 
-        // Generate the fallback: [[string] [ε]].
+        // Generate the fallback: [[grammar] [ε]].
         fallbackSequence := [][]IRuleModel{
             {model.NewRuleModel(g.startRule, NonTerminal, nil)},
             {model.NewRuleModel("ε", Terminal, nil)},
         }
 
-        // Mark the failure in dynamicRuleStack.
-        g.dynamicRuleStack = append(g.dynamicRuleStack, "FALLBACK_MARKER")
+        g.AddFallbackMarker()
 
         // -- Debug --
         // log.Printf("RebuildProductionSequenceFromPhenotype: Fallback sequence generated: %v", fallbackSequence) 
@@ -6356,6 +6422,7 @@ func (g *Genomizer) RepairIndividual(ind IIndividual) error {
         if r := recover(); r != nil {
            model.RestoreIndividualState(concreteInd, oldState)
         }
+        
     }()
 
     // -- Debug --
@@ -6382,24 +6449,85 @@ func (g *Genomizer) RepairIndividual(ind IIndividual) error {
     
         if !g.CanReduceToInitialSymbol(phenotypeStr, 20) {
             
-            // If the reduction fails, restore the initial state.
-            model.RestoreIndividualState(concreteInd, oldState)
-            
+            // If the reduction fails, Mark the individual as exhausted and 
+            // preserve the phenotype..
+            concreteInd.SetLastValidPhenotype(phenotypeStr)
+            concreteInd.SetExhausted(true)
+            g.AddFallbackMarker()
+
             // -- Debug --
-            // log.Printf("RepairIndividual: Phenotype %q cannot be reduced to initial symbol. Skipping repair.", phenotypeStr)
+            // log.Printf("RepairIndividual: Phenotype %q cannot be reduced. Marked as exhausted.", phenotypeStr)
 
             return nil
         }
     
     }
 
-    // If the individual is abstract (without dynamic rules), copy them from the Genomizer.
-    if len(concreteInd.GetDynamicRules()) == 0 {
+        // -- Debug --
+        // log.Printf("RepairIndividual: g.dynamicRules before copy dynamic rules: %v", g.dynamicRules)
+        // log.Printf("RepairIndividual: g.dynamicRulesStach before copy dynamic rules: %v", g.dynamicRuleStack)
+        // log.Printf("RepairIndividual: individual.dynamicRules before copy dynamic rules: %v", concreteInd.GetDynamicRules())
+        // log.Printf("RepairIndividual: individual.dynamicRuleStack before copy dynamic rules: %v", concreteInd.GetDynamicRuleStack())
 
-        // Copy dynamic rules from the Genomizer to the individual.
-        concreteInd.SetDynamicRules(utils.DeepCopyMap(g.dynamicRules))
+    
+    // Vérifier la cohérence entre dynamicRuleStack et dynamicRules.
+    //    Cas 1 : dynamicRuleStack est vide mais dynamicRules ne l'est pas.
+    //    Cas 2 : dynamicRuleStack contient des règles qui n'existent pas dans dynamicRules.
+    if len(g.dynamicRuleStack) == 0 && len(g.dynamicRules) > 0 {
+    
+        // Reconstruire dynamicRuleStack depuis dynamicRules.
+        ruleNames := make([]string, 0, len(g.dynamicRules))
+    
+        for ruleName := range g.dynamicRules {
+            ruleNames = append(ruleNames, ruleName)
+        }
+    
+        sort.Strings(ruleNames)
+        g.dynamicRuleStack = ruleNames    
+
+        // -- Debug --
+        // log.Printf("RepairIndividual: g.dynamicRuleStack case 1: %v", g.dynamicRuleStack)
+
+    } else if len(g.dynamicRuleStack) > 0 {    
+
+        // Verify that all rules in dynamicRuleStack exist in dynamicRules.
+        validStack := make([]string, 0, len(g.dynamicRuleStack))
+
+        for _, ruleName := range g.dynamicRuleStack {
+        
+            if _, exists := g.dynamicRules[ruleName]; exists {
+                validStack = append(validStack, ruleName)
+            }
+
+        }
+
+        // If rules are missing, rebuild dynamicRuleStack from dynamicRules.
+        if len(validStack) != len(g.dynamicRuleStack) {
+            ruleNames := make([]string, 0, len(g.dynamicRules))
+        
+            for ruleName := range g.dynamicRules {
+                ruleNames = append(ruleNames, ruleName)
+            }
+    
+            sort.Strings(ruleNames)  // For deterministic consistency
+            g.dynamicRuleStack = ruleNames
+
+            // -- Debug --
+            // log.Printf("RepairIndividual: g.dynamicRuleStack case 2: %v", g.dynamicRuleStack)
+        }
 
     }
+
+    // If the individual is abstract (without dynamic rules or ARNnc stack), copy them from the Genomizer.
+    // Copy dynamic rules from the Genomizer to the individual.
+    concreteInd.SetDynamicRules(utils.DeepCopyMap(g.dynamicRules))
+    concreteInd.SetDynamicRuleStack(utils.DeepCopyStringSlice(g.dynamicRuleStack))
+
+    // -- Debug --
+    // log.Printf("RepairIndividual: individual.dynamicRules after copy dynamic rules: %v", concreteInd.GetDynamicRules())
+    // log.Printf("RepairIndividual: individual.dynamicRuleStack after copy dynamic rules: %v", concreteInd.GetDynamicRuleStack())
+    // log.Printf("RepairIndividual: g.dynamicRules: %v", g.dynamicRules)
+    // log.Printf("RepairIndividual: g.dynamicRulesStach: %v", g.dynamicRuleStack)
 
     // -- Debug --
     // log.Printf("RepairIndividual: history before Genomize n°1 %v", g.productionHistory)

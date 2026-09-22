@@ -313,12 +313,14 @@ func Step(
 
 		if ind.GetFitness() < 1.0 {
    
+            concreteInd, isIndividual := ind.(*Individual)
+
 			// Apply the corrections in order.
-            if ind.GetFitness() > 0.0 {  // All "sick" individuals are treated
+            if isIndividual && !concreteInd.GetExhausted() && concreteInd.GetFitness() > 0.0 {  // All "sick" individuals are treated
 
 				// (Non-coding RNAs): Rapid and adaptive response (such as 
 				// ncRNAs that regulate gene expression in real time).
-                if ok, err := population.CorrectByTemplate(ind, templateFunction, fitnessFunction); err != nil {
+                if ok, err := population.CorrectByTemplate(concreteInd, templateFunction, fitnessFunction); err != nil {
                     
 					// -- Error --
 					log.Printf("Template fix failure:: %v", err)
@@ -335,47 +337,56 @@ func Step(
                 	}
 
                 } else if ok {
-                    newIndividuals[i] = ind
+                    newIndividuals[i] = concreteInd
                 
-					if ind.GetFitness() >= 1.0 { continue }  // Move to the next individual if the target is reached
+					if concreteInd.GetFitness() >= 1.0 { continue }  // Move to the next individual if the target is reached
                 
 				}
 
+			// -- Debug --
+        	// log.Printf("RepairIndividual: individual.dynamicRules after CorrectByTemplate: %v", concreteInd.GetDynamicRules())
+        	// log.Printf("RepairIndividual: individual.dynamicRuleStack after CorrectByTemplate: %v", concreteInd.GetDynamicRuleStack())
+
             }
 			
-            if ind.GetFitness() < 0.9 {
+            if isIndividual && !concreteInd.GetExhausted() && concreteInd.GetFitness() < 0.9 {
 
 				// (lymphocytes B/T): A global and systemic response (such as 
 				// lymphocytes eliminating entire cells if they are defective).
-                if ok, err := population.CorrectByGenome(ind, newIndividuals, 0.7, averageFitness, fitnessFunction); err != nil {
+                if ok, err := population.CorrectByGenome(concreteInd, newIndividuals, 0.7, averageFitness, fitnessFunction); err != nil {
             
 					// -- Error --
 					log.Printf("Step - After CorrectByGenome: Genome error: %v", err)
 
                 } else if ok {
-                    newIndividuals[i] = ind
+                    newIndividuals[i] = concreteInd
                 
-					if ind.GetFitness() >= 1.0 { continue }  // Move to the next individual if the target is reached
+					if concreteInd.GetFitness() >= 1.0 { continue }  // Move to the next individual if the target is reached
 				}
 
+			// -- Debug --
+        	// log.Printf("RepairIndividual: individual.dynamicRules after CorrectByGenome: %v", concreteInd.GetDynamicRules())
+        	// log.Printf("RepairIndividual: individual.dynamicRuleStack after CorrectByGenome: %v", concreteInd.GetDynamicRuleStack())
+
             }
-    		
-			// Apply CorrectByGrammaticalPaths ONLY if Exhausted is false.
-            concreteInd, ok := ind.(*Individual)
 			
- 			if ok && !concreteInd.GetExhausted() && ind.GetFitness() < 0.95 {
+ 			if isIndividual && !concreteInd.GetExhausted() && concreteInd.GetFitness() < 0.95 {
 
 				// (repair enzymes): Localized and targeted response to 
 				// structural motifs (such as site-specific DNA repair).
-				if ok, err := population.CorrectByGrammaticalPaths(ind, 0.8, fitnessFunction); err != nil {
+				if ok, err := population.CorrectByGrammaticalPaths(concreteInd, 0.8, fitnessFunction); err != nil {
 
 					// -- Error --
                     log.Printf("Step - After CorrectByGrammaticalPaths: Grammatical error: %v", err)
                 
 					concreteInd.SetExhausted(true)
 				} else if ok {
-                    newIndividuals[i] = ind
+                    newIndividuals[i] = concreteInd
                 }
+
+			// -- Debug --
+        	// log.Printf("RepairIndividual: individual.dynamicRules after CorrectByGenome: %v", concreteInd.GetDynamicRules())
+        	// log.Printf("RepairIndividual: individual.dynamicRuleStack after CorrectByGenome: %v", concreteInd.GetDynamicRuleStack())
 
 			}			
 						
