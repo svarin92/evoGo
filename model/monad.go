@@ -31,6 +31,10 @@ func (state *IndividualState) GetFitness() float64 {
 	return state.fitness
 }
 
+func (state *IndividualState) GetPhenotype() any {
+	return state.phenotype
+}
+
 /* Individual */
 
 // Individual represents a cellular agent with its own genome and phenotype.
