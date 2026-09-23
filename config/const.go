@@ -10,6 +10,10 @@ const (
 	GENERATIONS             int     = 10
 	GENERATION_SIZE         int     = 20
 
+	// Default_Base_Max_Depth est le budget de base commun à toutes les réductions
+	DEFAULT_BASE_MAX_DEPTH  int     = 20
+
+
 	// MAX_WRAPS defines the maximum number of times the genome can be reused.
 	// A value of 100 allows for good diversity without the risk of infinite 
 	// loops.

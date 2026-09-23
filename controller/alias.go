@@ -59,6 +59,7 @@ const (
 const (
 	CODONS_SIZE             = config.CODONS_SIZE
 	EXPLORATION_PROBABILITY = config.EXPLORATION_PROBABILITY
+	DEFAULT_BASE_MAX_DEPTH  = config.DEFAULT_BASE_MAX_DEPTH
 	MAX_WRAPS               = config.MAX_WRAPS
 )
 

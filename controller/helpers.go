@@ -215,12 +215,21 @@ func HasTailSymbol(production []IRuleModel) bool {
 // ParseSymbol analyze a symbol string to extract the symbol and its type.
 func IsSameSymbol(a, b string) bool {
     
-    // Extraire le nom du symbole (premier mot).
+    // Extract the symbol name (first word).
     aName := strings.Split(strings.TrimSpace(a), " ")[0]
     bName := strings.Split(strings.TrimSpace(b), " ")[0]
     
-    // Comparer uniquement les noms (ignorer les indices de type et les espaces supplémentaires).
+    // Compare only the names (ignore type indices and extra spaces).
     return aName == bName
+}
+
+// MaxDepthForPhenotype calculates the reduction depth budget for a
+// phenotype. This is the ONLY place where this rule is defined; all
+// reduction functions must use it.
+func MaxDepthForPhenotype(phenotype string, baseMaxDepth int) int {
+	
+    // Rule: base budget + 1 additional reduction for every 5 characters.
+    return baseMaxDepth + len(phenotype)/5
 }
 
 // ParseSymbol analyze a symbol string to extract the symbol and its type.
