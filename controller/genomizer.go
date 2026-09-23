@@ -1172,7 +1172,7 @@ func (g *Genomizer) CanReduceSequence(subSequence []IRuleModel) ([]IRuleModel, b
 func (g *Genomizer) CanReduceToInitialSymbol(phenotype string, baseMaxDepth int) bool {
 
     // -- Debug --
-    // log.Printf("CanReduceToInitialSymbol: Phenotype initial %v", phenotype)
+    log.Printf("CanReduceToInitialSymbol: Phenotype initial %v", phenotype)
 
     // Verify that all terminals exist in the grammar.
     for _, terminal := range strings.Split(phenotype, "") {
@@ -1187,8 +1187,9 @@ func (g *Genomizer) CanReduceToInitialSymbol(phenotype string, baseMaxDepth int)
 
     }
 
-    // Adjust maxDepth based on the phenotype length.
-    maxDepth := baseMaxDepth + len(phenotype)/5  // Example: +1 for every 5 characters
+    // Adjust maxDepth based on the phenotype length. 
+    // Example: +1 for every 5 characters
+    maxDepth := MaxDepthForPhenotype(phenotype, baseMaxDepth)
 
     cacheKey := fmt.Sprintf("%s:%d", phenotype, maxDepth)  // Include maxDepth in the key
 
@@ -1480,7 +1481,7 @@ func (g *Genomizer) CorrectByGrammaticalPaths(
     }
 
     // Define a maximum derivation depth.
-    maxDepth := 20
+    maxDepth := MaxDepthForPhenotype(phenotypeStr, DEFAULT_BASE_MAX_DEPTH)
 
     // -- Debug -- Start reconstruction of the production sequence.
     // log.Printf("CorrectByGrammaticalPaths: Rebuilding production sequence for phenotype: %q", phenotypeStr)
@@ -5397,7 +5398,9 @@ func (g *Genomizer) GenomizeFromStringPhenotype(phenotypeStr string) error {
     // Clear current history.
     g.productionHistory = [][]IRuleModel{}
 
-    productionSequence, err := g.RebuildProductionSequence(phenotypeStr, 20)
+    // The safety net (retry with increased budget) catches residual
+    // failures here.
+    productionSequence, err := g.RebuildProductionSequenceWithRetry(phenotypeStr, DEFAULT_BASE_MAX_DEPTH)
     
     if err != nil {
         return err
@@ -5874,7 +5877,7 @@ func (g *Genomizer) RebuildGenome(individual *Individual, usePhenotype bool) err
         phenotype := individual.GetPhenotype().(string)
 
         // Check if the reduction is possible.
-        if !g.CanReduceToInitialSymbol(phenotype, 20) {
+        if !g.CanReduceToInitialSymbol(phenotype, DEFAULT_BASE_MAX_DEPTH) {
 
             // Mark the individual as exhausted and preserve the phenotype.
             individual.SetLastValidPhenotype(phenotype)  // Save the original phenotype
@@ -6276,6 +6279,31 @@ func (g *Genomizer) RebuildProductionSequenceFromPhenotype(
     return g.RebuildProductionSequence(target, maxDepth)
 }
 
+// RebuildProductionSequenceWithRetry tries again with a larger budget before 
+// giving up.
+func (g *Genomizer) RebuildProductionSequenceWithRetry(phenotypeStr string,
+	baseMaxDepth int) ([][]IRuleModel, error) {
+
+	maxDepth := MaxDepthForPhenotype(phenotypeStr, baseMaxDepth)
+	sequence, err := g.RebuildProductionSequence(phenotypeStr, maxDepth)
+
+	if err == nil {
+		return sequence, nil
+	}
+
+	// Retry once with an increased base (e.g., +50%).
+	sequence, err2 := g.RebuildProductionSequence(phenotypeStr, maxDepth+maxDepth/2)
+	
+    if err2 == nil {
+		return sequence, nil
+	}
+
+	return nil, fmt.Errorf(
+		"failed to reduce to initial symbol (maxDepth=%d, retried=%d): %w",
+		maxDepth, maxDepth+maxDepth/2, err,
+    )
+}
+
 // RecentSuccessScore is a measure of a production's recent performance, 
 // based on recent generations. It is calculated using a history of the last 
 // successful productions, and reflects the recent quality of a production, 
@@ -6342,7 +6370,7 @@ func (g *Genomizer) ReduceToInitialSymbol(
         reduced := false
 
         // 1. Reduction of first-rank non-terminals, 
-        //      e.g., vowel → letter.
+        //    e.g., vowel → letter.
         if g.ApplyAtomicReductions(&currentSymbols, &productionSequence, &depth, cache) {
             reduced = true
 
@@ -6351,7 +6379,7 @@ func (g *Genomizer) ReduceToInitialSymbol(
         }
 
         // 2. Reduction of homogeneous sequences,
-        //      e.g., [letter letter letter] → letters.
+        //    e.g., [letter letter letter] → letters.
         if !reduced && g.ApplySequenceReduction(&currentSymbols, &productionSequence, &depth, cache) {
             reduced = true
 
@@ -6368,7 +6396,7 @@ func (g *Genomizer) ReduceToInitialSymbol(
         }
 
         // 4. Simplification of repetitive sequences,
-        //      e.g., [syllable syllable] → syllable_2.
+        //    e.g., [syllable syllable] → syllable_2.
         if !reduced && g.ApplySequenceSimplification(&currentSymbols, &productionSequence, &depth, cache) {
             reduced = true
 
@@ -6377,7 +6405,7 @@ func (g *Genomizer) ReduceToInitialSymbol(
         }
 
         // 5. Recursive reductions, 
-        //      e.g., "string → syllable string".
+        //    e.g., "string → syllable string".
         if !reduced && g.ApplyDirectRecursiveMatches(&currentSymbols, &productionSequence, &depth, cache) {
             reduced = true
 
@@ -6447,7 +6475,7 @@ func (g *Genomizer) RepairIndividual(ind IIndividual) error {
             return fmt.Errorf("RepairIndividual: phenotype is not a string")
         }
     
-        if !g.CanReduceToInitialSymbol(phenotypeStr, 20) {
+        if !g.CanReduceToInitialSymbol(phenotypeStr, DEFAULT_BASE_MAX_DEPTH) {
             
             // If the reduction fails, Mark the individual as exhausted and 
             // preserve the phenotype..
@@ -6456,7 +6484,7 @@ func (g *Genomizer) RepairIndividual(ind IIndividual) error {
             g.AddFallbackMarker()
 
             // -- Debug --
-            // log.Printf("RepairIndividual: Phenotype %q cannot be reduced. Marked as exhausted.", phenotypeStr)
+            log.Printf("RepairIndividual: Phenotype %q cannot be reduced. Marked as exhausted.", phenotypeStr)
 
             return nil
         }
@@ -6470,12 +6498,13 @@ func (g *Genomizer) RepairIndividual(ind IIndividual) error {
         // log.Printf("RepairIndividual: individual.dynamicRuleStack before copy dynamic rules: %v", concreteInd.GetDynamicRuleStack())
 
     
-    // Vérifier la cohérence entre dynamicRuleStack et dynamicRules.
-    //    Cas 1 : dynamicRuleStack est vide mais dynamicRules ne l'est pas.
-    //    Cas 2 : dynamicRuleStack contient des règles qui n'existent pas dans dynamicRules.
+    // Check for consistency between dynamicRuleStack and dynamicRules: 
+    // - case 1: dynamicRuleStack is empty, but dynamicRules is not. 
+    // - case 2: dynamicRuleStack contains rules that do not exist in 
+    //           dynamicRules.
     if len(g.dynamicRuleStack) == 0 && len(g.dynamicRules) > 0 {
     
-        // Reconstruire dynamicRuleStack depuis dynamicRules.
+        // Rebuild dynamicRuleStack from dynamicRules.
         ruleNames := make([]string, 0, len(g.dynamicRules))
     
         for ruleName := range g.dynamicRules {
