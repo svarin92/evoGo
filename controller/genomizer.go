@@ -1172,7 +1172,7 @@ func (g *Genomizer) CanReduceSequence(subSequence []IRuleModel) ([]IRuleModel, b
 func (g *Genomizer) CanReduceToInitialSymbol(phenotype string, baseMaxDepth int) bool {
 
     // -- Debug --
-    log.Printf("CanReduceToInitialSymbol: Phenotype initial %v", phenotype)
+    // log.Printf("CanReduceToInitialSymbol: Phenotype initial %v", phenotype)
 
     // Verify that all terminals exist in the grammar.
     for _, terminal := range strings.Split(phenotype, "") {
@@ -2187,21 +2187,49 @@ func (g *Genomizer) DecodeCodonBlockWithDynamicRules(block []int) ([][]IRuleMode
             // log.Printf("DecodeCodonBlockWithDynamicRules: ARNs: %v", g.dynamicRules)
             // log.Printf("DecodeCodonBlockWithDynamicRules: stack before pop: %v", g.dynamicRuleStack)
 
-            if len(g.dynamicRuleStack) == 0 {
-                return nil, fmt.Errorf("no non-coding RNA in stack for codon -1 at position %d", codonIndex)
+            // SAFETY 1: if the stack is empty, try to rebuild it from the
+            // available dynamic rules (deterministic order, no
+            // FALLBACK_MARKER, no rule without production).
+            if len(g.dynamicRuleStack) == 0 && len(g.dynamicRules) > 0 {
+                g.RebuildDynamicRuleStackFromRules()
             }
 
-            // Retrieve the dynamic rule from the stack.
-            ruleName := g.dynamicRuleStack[len(g.dynamicRuleStack)-1]
+            // SAFETY 2: pop stack entries until a usable ncRNA is found.
+            // Skip unusable entries (FALLBACK_MARKER, missing rule, or rule
+            // without production). FALLBACK_MARKER is a terminal marker rule
+            // with no production: reading it here would panic on
+            // rule.GetSymbols()[0].
+            var rule model.IRuleModel
+            found := false
 
-            // -- Debug --
-            // log.Printf("DecodeCodonBlockWithDynamicRules: Using non-coding RNA: %s (stack after pop: %v)",
-            //     ruleName, g.dynamicRuleStack)
+            for len(g.dynamicRuleStack) > 0 {
+                candidate := g.dynamicRuleStack[len(g.dynamicRuleStack)-1]
+                candidateRule, candidateExists := g.dynamicRules[candidate]
 
-            rule, exists := g.dynamicRules[ruleName]
+                if candidate != "FALLBACK_MARKER" && candidateExists && len(candidateRule.GetSymbols()) > 0 {
+                    rule = candidateRule
+                    found = true
+                    break
+                }
 
-            if !exists {
-                return nil, fmt.Errorf("non-coding RNA rule %q not found", ruleName)
+                // Discard the unusable entry (do not reuse FALLBACK_MARKERS).
+                g.dynamicRuleStack = g.dynamicRuleStack[:len(g.dynamicRuleStack)-1]
+            }
+
+            // SAFETY 3: no usable ncRNA at all — degrade gracefully instead
+            // of failing, exactly like GenerateWithDynamicRules does: consume
+            // the -1 marker and continue with the normal derivation.
+            if !found {
+
+                // -- Warning --
+                log.Printf(
+                    "DecodeCodonBlockWithDynamicRules: no usable non-coding RNA for codon -1 at position %d, skipping marker",
+                    codonIndex,
+                )
+
+                g.usedCodons++
+                codonIndex++  // Consume the -1 marker
+                continue       // Move to the next iteration
             }
 
             // Retrieve RNA production.
@@ -2209,15 +2237,20 @@ func (g *Genomizer) DecodeCodonBlockWithDynamicRules(block []int) ([][]IRuleMode
             productions = append(productions, rnaProduction)
 
             // Remove ALL symbols from the recursive production of currentSymbols.
-            for _, sym := range g.currentRecursiveProduction {
+            if g.currentRecursiveProduction != nil {
+            
+                for _, sym := range g.currentRecursiveProduction {
 
-                if len(currentSymbols) > 0 && currentSymbols[0] == sym.GetText() {
-                    currentSymbols = currentSymbols[1:]
+                    if len(currentSymbols) > 0 && currentSymbols[0] == sym.GetText() {
+                        currentSymbols = currentSymbols[1:]
 
                     // -- Debug --
                     log.Printf("DecodeCodonBlockWithDynamicRules: Current symbols: %v", currentSymbols)
-                }
 
+                    }
+
+                }
+            
             }
 
             // Add the RNA symbols to currentSymbols.
@@ -3446,13 +3479,13 @@ func (g *Genomizer) ExtractLinguisticPatterns(
     individual IIndividual,
 ) []LinguisticPattern {
 
-    // Sauvegarder une copie profonde de l'état actuel des ARNnc.
+    // Save a deep copy of the current state of the ncRNAs.
     oldDynamicRules := utils.DeepCopyMap(g.dynamicRules)
 
-    // Restaurer et synchroniser à la fin de la fonction.
+    // Restore and synchronize at the end of the function.
     defer func() {
 
-        // Fusionner oldDynamicRules (ARNnc persistants) avec g.dynamicRules.
+        // Merge oldDynamicRules (persistent ncRNAs) with g.dynamicRules.
         for ruleName, rule := range oldDynamicRules {
 
             if _, exists := g.dynamicRules[ruleName]; !exists {
@@ -3461,51 +3494,30 @@ func (g *Genomizer) ExtractLinguisticPatterns(
 
         }
 
-        // Reconstruire dynamicRuleStack depuis dynamicRules.
-        ruleNames := make([]string, 0, len(g.dynamicRules))
-
-        for ruleName := range g.dynamicRules {
-            ruleNames = append(ruleNames, ruleName)
-        }
-
-        sort.Strings(ruleNames)
-        g.dynamicRuleStack = ruleNames
+        // Rebuild dynamicRuleStack from dynamicRules.
+        g.RebuildDynamicRuleStackFromRules()
     }()
 
-    /* 
-    // Save the current ncRNAs from Genomizer.
-    oldDynamicRules := g.dynamicRules
-    defer func() {
-        validStack := make([]string, 0, len(g.dynamicRuleStack))
-
-        for _, ruleName := range g.dynamicRuleStack {
-        
-            if _, exists := g.dynamicRules[ruleName]; exists {
-                validStack = append(validStack, ruleName)
-            }
-
-        }
-
-        g.dynamicRuleStack = validStack
-        g.dynamicRules = oldDynamicRules
-    }()
-*/
     // Load ncRNAs from the individual.
-    g.dynamicRules = individual.GetDynamicRules()
+    individualRules := individual.GetDynamicRules()
+
+    mergedRules := utils.DeepCopyMap(g.dynamicRules)
+
+    for ruleName, rule := range individualRules {
+
+        if _, exists := mergedRules[ruleName]; !exists {
+            mergedRules[ruleName] = rule
+        }
+
+    }
+
+    g.dynamicRules = mergedRules
     g.dynamicRuleStack = individual.GetDynamicRuleStack()
 
     // Rebuild the stack if it is empty but rules exist:
     // → g.dynamicRuleStack is now populated with the dynamic rules.
     if len(g.dynamicRuleStack) == 0 && len(g.dynamicRules) > 0 {
-
-        ruleNames := make([]string, 0, len(g.dynamicRules))
-
-        for ruleName := range g.dynamicRules {
-            ruleNames = append(ruleNames, ruleName)
-        }
-
-        sort.Strings(ruleNames)  // Sort in a deterministic order
-        g.dynamicRuleStack = ruleNames
+        g.RebuildDynamicRuleStackFromRules()
     }
 
     // -- Debug -- State of ncRNAs after loading.
@@ -4957,33 +4969,56 @@ func (g *Genomizer) GenerateWithDynamicRules(
             // Handling of non-coding RNAs (codon == -1).
             if codon == -1 {
 
-                if len(g.dynamicRuleStack) == 0 {
-                    
+                // SAFETY 1: if the stack is empty, try to rebuild it from the
+                // available dynamic rules (deterministic order, no
+                // FALLBACK_MARKER, no rule without production).
+                if len(g.dynamicRuleStack) == 0 && len(g.dynamicRules) > 0 {
+                    g.RebuildDynamicRuleStackFromRules()
+                }
+
+                // SAFETY 2: pop stack entries until a usable ncRNA is found.
+                // Skip and discard unusable entries (FALLBACK_MARKER, missing
+                // rule, or rule without production). FALLBACK_MARKER is a
+                // terminal marker rule with no production: reading it here
+                // would panic on rule.GetSymbols()[0].
+                var rnaRule model.IRuleModel
+                found := false
+
+                for len(g.dynamicRuleStack) > 0 {
+
+                    // ncRNAs are degraded after use; the stack is cleared
+                    // after each decoding/generation step.
+                    candidate := g.dynamicRuleStack[len(g.dynamicRuleStack)-1]
+                    g.dynamicRuleStack = g.dynamicRuleStack[:len(g.dynamicRuleStack)-1]  // Remove from stack
+
+                    candidateRule, candidateExists := g.dynamicRules[candidate]
+
+                    if candidate != "FALLBACK_MARKER" && candidateExists && len(candidateRule.GetSymbols()) > 0 {
+                        rnaRule = candidateRule
+                        found = true
+                        break
+                    }
+
+                    // Unusable entry: already popped and discarded.
+                }
+
+                // SAFETY 3: no usable ncRNA at all — ignore the -1 marker
+                // and continue the normal derivation (existing behavior,
+                // now also reached after filtering).
+                if !found {
+
                     // -- Debug --
-                    // log.Printf("GenerateWithDynamicRules: Ignoring codon -1 (no non-coding RNA in stack)")
-                    
+                    // log.Printf("GenerateWithDynamicRules: Ignoring codon -1 (no usable non-coding RNA in stack)")
+
                     indexInput++  // Consume the -1 and continue
                     continue
                 }
 
-                // Retrieve the dynamic rule from the stack.
-                ruleName := g.dynamicRuleStack[len(g.dynamicRuleStack)-1]                
-
-                // ncRNAs are degraded after use; the stack is cleared after 
-                // each decoding/generation step.
-                g.dynamicRuleStack = g.dynamicRuleStack[:len(g.dynamicRuleStack)-1]  // Remove from stack
-
-                rule, exists := g.dynamicRules[ruleName]
-                
-                if !exists {
-                    return fmt.Errorf("non-coding RNA rule %q not found", ruleName)
-                }
-
                 // Retrieve the RNA production.
-                selectedProduction := rule.GetSymbols()[0]
-                
+                selectedProduction := rnaRule.GetSymbols()[0]
+
                 // -- Debug --
-                // log.Printf("GenerateWithDynamicRules: Using non-coding RNA %s: %v", ruleName, selectedProduction)
+                // log.Printf("GenerateWithDynamicRules: Using non-coding RNA %s: %v", rnaRule.GetText(), selectedProduction)
 
                 // Remove ALL symbols of the recursive production from 
                 // unexpandedSymbols. The recursive production is stored 
@@ -5215,12 +5250,12 @@ func (g *Genomizer) Genomize(genome []int, individual IIndividual) error {
     g.mu.Lock()
     defer g.mu.Unlock()
 
-    // Sauvegarder l'état initial de dynamicRules (pour fusionner les ARNnc persistants).
+    // Save the initial state of dynamicRules (to merge persistent ncRNAs).
     oldDynamicRules := utils.DeepCopyMap(g.dynamicRules)
 
     defer func() {
         
-        // Fusionner oldDynamicRules (ARNnc persistants) avec g.dynamicRules.
+        // Merge oldDynamicRules (persistent ncRNAs) with g.dynamicRules.
         for ruleName, rule := range oldDynamicRules {
         
             if _, exists := g.dynamicRules[ruleName]; !exists {
@@ -5229,54 +5264,34 @@ func (g *Genomizer) Genomize(genome []int, individual IIndividual) error {
         
         }
 
-        // Reconstruire dynamicRuleStack depuis dynamicRules.
-        ruleNames := make([]string, 0, len(g.dynamicRules))
-        
-        for ruleName := range g.dynamicRules {
-            ruleNames = append(ruleNames, ruleName)
-        }
-        
-        sort.Strings(ruleNames)
-        g.dynamicRuleStack = ruleNames
+        // Rebuild dynamicRuleStack from dynamicRules (excluding 
+        // FALLBACK_MARKER and rules without productions).
+        g.RebuildDynamicRuleStackFromRules()
     }()
 
-/*
-    // Save only dynamicRules (not the stack).
-    oldDynamicRules := g.dynamicRules
-    defer func() {
-        validStack := make([]string, 0, len(g.dynamicRuleStack))
+    // Load ncRNAs from the individual, MERGED with the Genomizer's
+    // persistent rules (do not overwrite: an individual whose ncRNAs were
+    // not synchronized — e.g. after a spliced/crossed-over genome — must
+    // still find the regulators needed to decode its -1 markers).
+    individualRules := individual.GetDynamicRules()
 
-        for _, ruleName := range g.dynamicRuleStack {
-        
-            if _, exists := g.dynamicRules[ruleName]; exists {
-                validStack = append(validStack, ruleName)
-            }
+    mergedRules := utils.DeepCopyMap(g.dynamicRules)
 
+    for ruleName, rule := range individualRules {
+
+        if _, exists := mergedRules[ruleName]; !exists {
+            mergedRules[ruleName] = rule
         }
 
-        g.dynamicRuleStack = validStack
-        g.dynamicRules = oldDynamicRules
-    }()
-*/
+    }
 
-    // Load ncRNAs from the individual.
-    g.dynamicRules = individual.GetDynamicRules()
+    g.dynamicRules = mergedRules
     g.dynamicRuleStack = individual.GetDynamicRuleStack()
 
     // Rebuild the stack if it is empty but rules exist:
     // → g.dynamicRuleStack is now populated with the dynamic rules.
     if len(g.dynamicRuleStack) == 0 && len(g.dynamicRules) > 0 {
-        
-        // Extract the rule names.
-        ruleNames := make([]string, 0, len(g.dynamicRules))
-    
-        for ruleName := range g.dynamicRules {
-            ruleNames = append(ruleNames, ruleName)
-        }
-    
-        // Sort the names (alphabetically or according to business logic).
-        sort.Strings(ruleNames)
-        g.dynamicRuleStack = ruleNames
+        g.RebuildDynamicRuleStackFromRules()
     }
 
     // -- Debug --
@@ -5845,6 +5860,29 @@ func (g *Genomizer) ProductionSimilarity(p1, p2 []IRuleModel) float64 {
 	return 1.0 - float64(distance)/float64(maxLen)
 }
 
+// RebuildDynamicRuleStackFromRules rebuilds g.dynamicRuleStack from
+// g.dynamicRules in deterministic (sorted) order, excluding FALLBACK_MARKER
+// (a failure signal, not a usable ncRNA) and rules without production.
+func (g *Genomizer) RebuildDynamicRuleStackFromRules() {
+    ruleNames := make([]string, 0, len(g.dynamicRules))
+
+    for name, rule := range g.dynamicRules {
+
+        if name == "FALLBACK_MARKER" {
+            continue
+        }
+
+        if len(rule.GetSymbols()) == 0 {
+            continue  // Unusable rule (e.g., terminal marker without production)
+        }
+
+        ruleNames = append(ruleNames, name)
+    }
+
+    sort.Strings(ruleNames)
+    g.dynamicRuleStack = ruleNames
+}
+
 // RebuildGenome reconstructs an individual's genome from either:
 // - The phenotype (explicit history via GenomizeFromPhenotype), or
 // - The production history (implicit history, preprocessed to explicit 
@@ -6183,28 +6221,10 @@ func (g *Genomizer) RebuildProductionSequenceFromPhenotype(
     // Deep copy of dynamicRules (map)
     oldDynamicRules := utils.DeepCopyMap(g.dynamicRules)
 
-/*    
-    // Restore the initial state at the end of the function.
-    defer func() {
-        validStack := make([]string, 0, len(g.dynamicRuleStack))
-
-        for _, ruleName := range g.dynamicRuleStack {
-        
-            if _, exists := g.dynamicRules[ruleName]; exists {
-                validStack = append(validStack, ruleName)
-            }
-
-        }
-
-        g.dynamicRuleStack = validStack
-        g.dynamicRules = oldDynamicRules
-    }()
-*/
-
-    // Restaurer et synchroniser à la fin de la fonction.
+    // Restore and synchronize at the end of the function.
     defer func() {
         
-        // Fusionner oldDynamicRules (ARNnc persistants) avec g.dynamicRules.
+        // Merge oldDynamicRules (persistent ncRNAs) with g.dynamicRules.
         for ruleName, rule := range oldDynamicRules {
         
             if _, exists := g.dynamicRules[ruleName]; !exists {
@@ -6213,15 +6233,8 @@ func (g *Genomizer) RebuildProductionSequenceFromPhenotype(
         
         }
 
-        // Reconstruire dynamicRuleStack depuis dynamicRules.
-        ruleNames := make([]string, 0, len(g.dynamicRules))
-        
-        for ruleName := range g.dynamicRules {
-            ruleNames = append(ruleNames, ruleName)
-        }
-        
-        sort.Strings(ruleNames)
-        g.dynamicRuleStack = ruleNames
+        // Rebuild dynamicRuleStack from dynamicRules.
+        g.RebuildDynamicRuleStackFromRules()
     }()
 
     // -- Debug --
@@ -6484,7 +6497,7 @@ func (g *Genomizer) RepairIndividual(ind IIndividual) error {
             g.AddFallbackMarker()
 
             // -- Debug --
-            log.Printf("RepairIndividual: Phenotype %q cannot be reduced. Marked as exhausted.", phenotypeStr)
+            // log.Printf("RepairIndividual: Phenotype %q cannot be reduced. Marked as exhausted.", phenotypeStr)
 
             return nil
         }
@@ -6502,49 +6515,29 @@ func (g *Genomizer) RepairIndividual(ind IIndividual) error {
     // - case 1: dynamicRuleStack is empty, but dynamicRules is not. 
     // - case 2: dynamicRuleStack contains rules that do not exist in 
     //           dynamicRules.
+    needsRebuild := false
+
     if len(g.dynamicRuleStack) == 0 && len(g.dynamicRules) > 0 {
-    
-        // Rebuild dynamicRuleStack from dynamicRules.
-        ruleNames := make([]string, 0, len(g.dynamicRules))
-    
-        for ruleName := range g.dynamicRules {
-            ruleNames = append(ruleNames, ruleName)
-        }
-    
-        sort.Strings(ruleNames)
-        g.dynamicRuleStack = ruleNames    
-
-        // -- Debug --
-        // log.Printf("RepairIndividual: g.dynamicRuleStack case 1: %v", g.dynamicRuleStack)
-
+        needsRebuild = true
     } else if len(g.dynamicRuleStack) > 0 {    
 
         // Verify that all rules in dynamicRuleStack exist in dynamicRules.
-        validStack := make([]string, 0, len(g.dynamicRuleStack))
-
         for _, ruleName := range g.dynamicRuleStack {
         
-            if _, exists := g.dynamicRules[ruleName]; exists {
-                validStack = append(validStack, ruleName)
+            if _, exists := g.dynamicRules[ruleName]; !exists {
+                needsRebuild = true
+                break
             }
 
         }
 
-        // If rules are missing, rebuild dynamicRuleStack from dynamicRules.
-        if len(validStack) != len(g.dynamicRuleStack) {
-            ruleNames := make([]string, 0, len(g.dynamicRules))
-        
-            for ruleName := range g.dynamicRules {
-                ruleNames = append(ruleNames, ruleName)
-            }
-    
-            sort.Strings(ruleNames)  // For deterministic consistency
-            g.dynamicRuleStack = ruleNames
+    }
 
-            // -- Debug --
-            // log.Printf("RepairIndividual: g.dynamicRuleStack case 2: %v", g.dynamicRuleStack)
-        }
+    if needsRebuild {
+        g.RebuildDynamicRuleStackFromRules()
 
+        // -- Debug --
+        // log.Printf("RepairIndividual: g.dynamicRuleStack rebuilt: %v", g.dynamicRuleStack)
     }
 
     // If the individual is abstract (without dynamic rules or ARNnc stack), copy them from the Genomizer.
@@ -6821,37 +6814,106 @@ func (g *Genomizer) SelectProductionByRandom(
     return choices[selectedIndex]
 }
 
-// SpliceGenomeFromHistory generates a genome segment to be spliced ​​into 
-// the existing genome. Used for targeted updating (preservation of genetic 
-// information).
+// SpliceGenomeFromHistory rebuilds the individual's genome from its production
+// history by splicing the newly encoded codons at the start of the existing
+// genome. Because EncodeProductionHistoryToCodonsWithDynamicRules may insert
+// -1 markers (ncRNA triggers) and register the corresponding dynamic rules
+// (regulators) in the Genomizer, this method MUST synchronize those rules to
+// the individual. Otherwise, the next Genomize/DecodeCodonBlockWithDynamicRules
+// would fail with "no non-coding RNA in stack for codon -1".
 func (g *Genomizer) SpliceGenomeFromHistory(individual *Individual) error {
 
-    // 1. Encode the new productionHistory into a sequence of codons.
-    newCodons := g.EncodeProductionHistoryToGenomeSegment(individual.GetProductionHistory())
-    // fmt.Printf("DEBUG: Encoded %d new codons from productionHistory\n", len(newCodons))
+    // Save the current ncRNA state for restoration in case of error.
+    oldDynamicRules := utils.DeepCopyMap(individual.GetDynamicRules())
+    oldDynamicRuleStack := utils.DeepCopyStringSlice(individual.GetDynamicRuleStack())
+    oldGenome := make([]int, len(individual.GetGenome()))
+    copy(oldGenome, individual.GetGenome())
 
-    // 2. Check that newCodons is not empty.
+    // Encode the new productionHistory into a sequence of codons.
+    // NOTE: this call may register new dynamic rules in g.dynamicRules
+    // and push their names onto g.dynamicRuleStack (e.g., "letter_exp").
+    newCodons := g.EncodeProductionHistoryToGenomeSegment(individual.GetProductionHistory())
+
+    // -- Debug --
+    // log.Printf("SpliceGenomeFromHistory: Encoded %d new codons from productionHistory\n", len(newCodons))
+
+    // Check that newCodons is not empty.
     if len(newCodons) == 0 {
         return fmt.Errorf("no codons encoded from productionHistory")
     }
 
-    // 3. Check that the existing genome is the correct size.
+    // Check that the existing genome is the correct size.
     if len(individual.GetGenome()) != CODONS_SIZE {
         return fmt.Errorf("genome size is %d, expected %d", len(individual.GetGenome()), CODONS_SIZE)
     }
 
-    // 4. Splice the genome: replace the first len(newCodons) codons with 
-    //    newCodons.
+    // Splice the genome: replace the first len(newCodons) codons with 
+    // newCodons.
     if len(newCodons) <= len(individual.GetGenome()) {
 
         // Replace the corresponding segment.
         individual.UpdateGenomeSegment(newCodons, 0)
-        // fmt.Printf("DEBUG: Spliced genome: first %d codons replaced\n", len(newCodons))
+
+        // -- Debug --
+        // log.Printf("SpliceGenomeFromHistory: Spliced genome: first %d codons replaced\n", len(newCodons))
     } else {
 
         // If newCodons is larger than the genome (unlikely case), truncate.
         individual.UpdateGenomeSegment(newCodons[:CODONS_SIZE], 0)
-        // fmt.Println("DEBUG: newCodons larger than genome, truncated")
+    
+        // -- Debug --
+        // fmt.Println("DEBUG: newCodons larger than genome, truncated")    
+    }
+
+    // Synchronize the ncRNAs to the individual. Merge the Genomizer's rules 
+    // with the individual's existing ones so that previously stored ncRNAs 
+    // are not lost (an individual's rules  may have been synthesized by an 
+    // earlier RebuildGenome/Genomize).
+    mergedRules := utils.DeepCopyMap(individual.GetDynamicRules())
+
+    for ruleName, rule := range g.GetDynamicRules() {
+
+        if _, exists := mergedRules[ruleName]; !exists {
+            mergedRules[ruleName] = rule
+        }
+
+    }
+
+    individual.SetDynamicRules(mergedRules)
+
+    // Rebuild the stack:
+    // - keep the individual's stack entries that still resolve to a rule,
+    // - then append the regulators registered during this encoding, in
+    //   order, so that each -1 marker in the spliced genome finds its
+    //   ncRNA on top of the stack when decoded (LIFO order).
+    validStack := make([]string, 0, len(individual.GetDynamicRuleStack()))
+
+    for _, ruleName := range individual.GetDynamicRuleStack() {
+
+        if _, exists := mergedRules[ruleName]; exists {
+            validStack = append(validStack, ruleName)
+        }
+
+    }
+
+    for _, ruleName := range g.GetDynamicRuleStack() {
+
+        if !slices.Contains(validStack, ruleName) {
+            validStack = append(validStack, ruleName)
+        }
+
+    }
+
+    individual.SetDynamicRuleStack(validStack)
+
+    // If the spliced genome contains -1 markers but the stack ended 
+    // up empty (defensive check), fail fast here with a clear message 
+    // instead of letting Genomize crash later.
+    if slices.Contains(individual.GetGenome(), -1) && len(validStack) == 0 {
+        individual.SetGenome(oldGenome)
+        individual.SetDynamicRules(oldDynamicRules)
+        individual.SetDynamicRuleStack(oldDynamicRuleStack)
+        return fmt.Errorf("spliced genome contains -1 markers but no non-coding RNA is available")
     }
 
     return nil
