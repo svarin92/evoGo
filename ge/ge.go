@@ -122,6 +122,10 @@ func SearchLoop(
 	for ; generation <= maxGenerations+1; generation++ {
 		var err error
 		var currentBestEver IIndividual
+
+		// Hybridization hook (nil-safe, no-op without cellular module).
+		population.genomizer.NotifyGenerationStart(generation, population.individuals)
+		
 		population, currentBestEver, err = Step(
 			population, 
 			grammar, 
@@ -144,6 +148,10 @@ func SearchLoop(
             bestEver = currentBestEver
             bestGeneration = generation  // Update the generation of the best individual
         }
+
+		// AFTER the evaluation, the module collects (HarvestByOrgan on the
+		// evoCell side) the generation results, including bestEver.
+		population.genomizer.NotifyGenerationEnd(generation, bestEver)
 
 		renderer.PrintStats(population, generation, GENERATION_SIZE)
 	}

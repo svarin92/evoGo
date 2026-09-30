@@ -38,8 +38,11 @@ type IGenomizer interface {
 	GetUsedCodons() int
 	GetUsedWraps() int
 	FindSimilarProductions(production []IRuleModel, averageFitness float64) [][]IRuleModel
+	NotifyGenerationStart(gen int, population []IIndividual)
+	NotifyGenerationEnd(gen int, bestEver IIndividual)
 	ProductionSimilarity(p1, p2 []IRuleModel) float64
 	RepairIndividual(ind IIndividual) error
+	SetHybridizationHook(hook IHybridizationHook)
 	UpdatePatternLibrary(individuals []IIndividual)
 	UpdateSuccessfulProductions(individuals []IIndividual)
 }
