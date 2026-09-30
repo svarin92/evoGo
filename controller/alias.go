@@ -17,13 +17,14 @@ type (
 
 // Interfaces imported to ensure architectural consistency.
 type (
-	IBuilder                = interfaces.IBuilder
 	IGenomizer              = interfaces.IGenomizer
-	IGrammar                = interfaces.IGrammar
 	ISerializer             = interfaces.ISerializer
 	ISuccessfulProduction   = interfaces.ISuccessfulProduction
 
 	IAlgo                   = interfaces.IAlgo
+	IBuilder                = interfaces.IBuilder
+	IGrammar                = interfaces.IGrammar
+
 	IParseEBNF              = interfaces.IParseEBNF
 	IParseExpression        = interfaces.IParseExpression
 	IParseRule              = interfaces.IParseRule
@@ -31,6 +32,7 @@ type (
 	IParseSubExpression     = interfaces.IParseSubExpression
 	IParseTerm              = interfaces.IParseTerm
 
+	IHybridizationHook      = interfaces.IHybridizationHook
 	IIndividual             = interfaces.IIndividual
 	IRuleModel              = interfaces.IRuleModel
 )

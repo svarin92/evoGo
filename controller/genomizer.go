@@ -44,7 +44,9 @@ type SuccessfulGenome struct {
 
 /* Genomizer */
 
-// Genomizer (equivalent to cellular machinery): nucleus or ribosomes
+// Genomizer orchestrates the evolutionary loop and owns the (optional) 
+// hybridization hook. It is equivalent to cellular machinery: nucleus 
+// or ribosomes
 type Genomizer struct {
 	symbols           map[string]IRuleModel
     grammar           IGrammar
@@ -53,6 +55,7 @@ type Genomizer struct {
 	startRule         string
 	usedCodons        int
 	usedWraps         int
+
     currentRecursiveProduction []IRuleModel  // Recursive production in progress (e.g., [letter 1 string_tail 1])
 
     // dynamicRules represents the cell's library of non-coding RNAs 
@@ -69,6 +72,10 @@ type Genomizer struct {
 
     failedProductions []FailedProduction
 	historySize       int       // History size
+
+    // hook is nil by default: evoGo runs standalone, unchanged.
+    hook              IHybridizationHook
+
     PatternLibrary    *LinguisticPatternLibrary
 
 	// productionHistory represents the history of productions used to 
@@ -5841,6 +5848,25 @@ func (g *Genomizer) IsTerminal(symbol string) bool {
     return !isNonTerminal  // If the symbol is not a key in g.symbols, it is a terminal
 }
 
+// NotifyGenerationStart forwards the pre-operators generation event 
+// to the hook, if any. NO-OP otherwise — zero cost without module.
+func (g *Genomizer) NotifyGenerationStart(gen int, population []IIndividual) {
+
+    if g.hook != nil {
+        g.hook.OnGenerationStart(gen, population)
+    }
+
+}
+
+// NotifyGenerationEnd forwards the post-evaluation event, if any.
+func (g *Genomizer) NotifyGenerationEnd(gen int, bestEver IIndividual) {
+
+    if g.hook != nil {
+        g.hook.OnGenerationEnd(gen, bestEver)
+    }
+
+}
+
 // ProductionSimilarity calculates the similarity between two productions.
 func (g *Genomizer) ProductionSimilarity(p1, p2 []IRuleModel) float64 {
 
@@ -6812,6 +6838,12 @@ func (g *Genomizer) SelectProductionByRandom(
 
     selectedIndex := rand.Intn(len(choices))
     return choices[selectedIndex]
+}
+
+// SetHybridizationHook attaches an external module. Passing nil detaches it. 
+// Nil-safe: every call site guards on hook != nil.
+func (g *Genomizer) SetHybridizationHook(hook IHybridizationHook) {
+    g.hook = hook
 }
 
 // SpliceGenomeFromHistory rebuilds the individual's genome from its production

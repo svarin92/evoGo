@@ -110,6 +110,13 @@ func (pop *Population) GetIndividuals() []IIndividual {
     return individuals
 }
 
+// SetHybridizationHook attaches an external module to the Genomizer of THIS
+// population (created by NewPopulation). A nil-safe pass-through: if not
+// called, there is no change in behavior.
+func (p *Population) SetHybridizationHook(hook IHybridizationHook) {
+    p.genomizer.SetHybridizationHook(hook)
+}
+
 // Size returns the number of individuals in the population.
 func (pop *Population) Size() int {
     return len(pop.individuals)

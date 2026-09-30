@@ -11,25 +11,26 @@ import (
 
 // Aliases for functional types.
 type (
-	FitnessFunc     = interfaces.FitnessFunc
-	ReplacementFunc = interfaces.ReplacementFunc
-	SelectionFunc   = interfaces.SelectionFunc
-	TemplateFunc    = interfaces.TemplateFunc
+	FitnessFunc        = interfaces.FitnessFunc
+	ReplacementFunc    = interfaces.ReplacementFunc
+	SelectionFunc      = interfaces.SelectionFunc
+	TemplateFunc       = interfaces.TemplateFunc
 )
 
 // Interfaces imported to ensure architectural consistency.
 type (
-	IIndividual    = interfaces.IIndividual
-	IRuleModel     = interfaces.IRuleModel
+	IIndividual        = interfaces.IIndividual
+	IHybridizationHook = interfaces.IHybridizationHook
+	IRuleModel         = interfaces.IRuleModel
 
-	IGenomizer     = interfaces.IGenomizer
-	IGrammar       = interfaces.IGrammar
-	IImmune        = interfaces.IImmune
+	IGenomizer         = interfaces.IGenomizer
+	IGrammar           = interfaces.IGrammar
+	IImmune            = interfaces.IImmune
 )
 
 // Alias ​​for concrete types.
 type (
-	Individual     = model.Individual
+	Individual         = model.Individual
 )
 
 const (
