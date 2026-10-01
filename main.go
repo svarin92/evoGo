@@ -6,10 +6,10 @@ import (
 
 	"github.com/alecthomas/kong"
 
-	"evoGo/evaluator"
-	"evoGo/ge"
-	"evoGo/grammar"
-	"evoGo/operators"
+	"github.com/svarin92/evoGo/evaluator"
+	"github.com/svarin92/evoGo/ge"
+	"github.com/svarin92/evoGo/grammar"
+	"github.com/svarin92/evoGo/operators"
 )
 
 // main.go - Implementation of a grammatical evolution (GE) algorithm to
@@ -79,9 +79,9 @@ func main() {
 		return operators.TournamentSelection(individuals, tournamentSize) 
 	}
 
-	// Grammatical Evolution (GE) - Execute the evolution algorithm over a 
-	// given number of generations. Returns the best individual found after 
-	// evolution, or an error.
+	// Grammatical Evolution (GE) without hybridization - Execute the 
+	// evolution algorithm over a given number of generations. Returns 
+	// the best individual found after evolution, or an error.
 	bestEver, err := ge.SearchLoop(
 		GENERATIONS,        // Total number of generations
 		POPULATION_SIZE,    // Population size

@@ -18,10 +18,10 @@ import (
 	"sync"
 	"time"
 
-	"evoGo/model"
-	"evoGo/utils"
-
 	lru "github.com/hashicorp/golang-lru"
+
+    "github.com/svarin92/evoGo/model"
+	"github.com/svarin92/evoGo/utils"
 )
 
 type FailedProduction struct {

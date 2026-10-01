@@ -3,8 +3,10 @@
 // See the LICENSE file for details.
 package notifier
 
-import "evoGo/interfaces"
-import "evoGo/patterns/visitor"
+import (
+	"github.com/svarin92/evoGo/interfaces"
+	"github.com/svarin92/evoGo/patterns/visitor"
+)
 
 // Interfaces imported to ensure architectural consistency.
 type (

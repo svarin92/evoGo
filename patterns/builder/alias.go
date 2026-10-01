@@ -4,8 +4,8 @@
 package builder
 
 import (
-	"evoGo/interfaces"
-	"evoGo/model"
+	"github.com/svarin92/evoGo/interfaces"
+	"github.com/svarin92/evoGo/model"
 )
 
 // Aliases for functional types.

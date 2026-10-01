@@ -4,11 +4,12 @@
 package controller
 
 import (
-	"evoGo/model"
 	"fmt"
 	"log"
 	"strconv"
 	"strings"
+
+    "github.com/svarin92/evoGo/model"
 )
 
 /* Generic helpers */

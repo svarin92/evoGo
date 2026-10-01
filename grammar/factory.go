@@ -9,7 +9,7 @@ import (
 
 	"github.com/alecthomas/kong"
 
-	"evoGo/controller"
+	"github.com/svarin92/evoGo/controller"
 )
 
 /* Exports */

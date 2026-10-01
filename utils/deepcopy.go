@@ -3,7 +3,7 @@
 // See the LICENSE file for details.
 package utils
 
-import "evoGo/interfaces"
+import "github.com/svarin92/evoGo/interfaces"
 
 // DeepCopyDynamicRules creates a deep copy of DynamicRules.
 func DeepCopyDynamicRules(rules map[string]interfaces.IRuleModel) map[string]interfaces.IRuleModel {

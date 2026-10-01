@@ -6,8 +6,8 @@ package ge
 import (
 	"fmt"
 
-	"evoGo/controller"
-	"evoGo/model"
+	"github.com/svarin92/evoGo/controller"
+	"github.com/svarin92/evoGo/model"
 )
 
 /* Exports */

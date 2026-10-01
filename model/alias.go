@@ -4,8 +4,8 @@
 package model
 
 import (
-	"evoGo/interfaces"
-	"evoGo/patterns/notifier"
+	"github.com/svarin92/evoGo/interfaces"
+	"github.com/svarin92/evoGo/patterns/notifier"
 )
 
 // Aliases for functional types.

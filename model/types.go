@@ -35,7 +35,7 @@ package model
 	- etc.
 */
 
-import "evoGo/interfaces"
+import "github.com/svarin92/evoGo/interfaces"
 
 // Constants for symbol types.
 const (

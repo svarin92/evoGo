@@ -11,9 +11,9 @@ import (
 
 	"github.com/alecthomas/participle/v2/ebnf"
 
-	"evoGo/grammar/optimizations"
-	"evoGo/patterns/algo"
-	"evoGo/patterns/builder"
+	"github.com/svarin92/evoGo/grammar/optimizations"
+	"github.com/svarin92/evoGo/patterns/algo"
+	"github.com/svarin92/evoGo/patterns/builder"
 )
 
 /* Serializer */

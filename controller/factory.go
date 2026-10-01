@@ -6,8 +6,8 @@ package controller
 import (
 	"sync"
 	
-	"evoGo/patterns/algo"
-	"evoGo/patterns/builder"
+	"github.com/svarin92/evoGo/patterns/algo"
+	"github.com/svarin92/evoGo/patterns/builder"
 )
 
 /* Exports */

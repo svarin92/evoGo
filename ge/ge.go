@@ -8,11 +8,11 @@ import (
 	"log"
 	"math/rand"
 
-	"evoGo/evaluator"
-	"evoGo/model"
-	"evoGo/operators"
-	"evoGo/renderer"
-	"evoGo/utils"
+	"github.com/svarin92/evoGo/evaluator"
+	"github.com/svarin92/evoGo/model"
+	"github.com/svarin92/evoGo/operators"
+	"github.com/svarin92/evoGo/renderer"
+	"github.com/svarin92/evoGo/utils"
 )
 
 // Evaluate initial population.
