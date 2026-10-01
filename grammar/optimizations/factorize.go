@@ -6,7 +6,7 @@ package optimizations
 import (
 	"slices"
 
-	"evoGo/model"
+	"github.com/svarin92/evoGo/model"
 )
 
 // DirectLeftRecurse eliminates direct left recursion in a rule.

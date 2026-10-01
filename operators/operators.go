@@ -8,7 +8,7 @@ import (
 	"math/rand"
 	"sort"
 
-	"evoGo/model"
+	"github.com/svarin92/evoGo/model"
 )
 
 // GenerationalReplacement replaces a population with a new one, while 

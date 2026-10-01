@@ -11,9 +11,9 @@ import (
 	"strconv"
 	"strings"
 
-	"evoGo/config"
-	"evoGo/model"
-	"evoGo/utils"
+	"github.com/svarin92/evoGo/config"
+	"github.com/svarin92/evoGo/model"
+	"github.com/svarin92/evoGo/utils"
 )
 
 /* Evaluator */

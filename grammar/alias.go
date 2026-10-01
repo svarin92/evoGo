@@ -3,7 +3,7 @@
 // See the LICENSE file for details.
 package grammar
 
-import "evoGo/interfaces"
+import "github.com/svarin92/evoGo/interfaces"
 
 // Aliases for functional types.
 type (

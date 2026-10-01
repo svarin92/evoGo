@@ -4,7 +4,7 @@
 package model
 
 import (
-    "evoGo/utils"
+    "github.com/svarin92/evoGo/utils"
 )
 
 /* IndividualState helpers */

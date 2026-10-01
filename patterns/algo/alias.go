@@ -4,8 +4,8 @@
 package algo
 
 import (
-	"evoGo/interfaces"
-	"evoGo/patterns/visitor"
+	"github.com/svarin92/evoGo/interfaces"
+	"github.com/svarin92/evoGo/patterns/visitor"
 )
 
 // Aliases for functional types.

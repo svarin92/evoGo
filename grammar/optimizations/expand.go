@@ -6,7 +6,7 @@ package optimizations
 import (
 	"fmt"
 
-	"evoGo/model"
+	"github.com/svarin92/evoGo/model"
 )
 
 // ExpandRepetition extends repetitions within a right-hand side (RHS) of 

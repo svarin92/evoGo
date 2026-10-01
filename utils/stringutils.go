@@ -6,7 +6,7 @@ package utils
 import (
 	"strings"
 
-	"evoGo/interfaces"
+	"github.com/svarin92/evoGo/interfaces"
 )
 
 // RuleModelSliceToString converts a list of RuleModel to a string.

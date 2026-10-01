@@ -4,8 +4,8 @@
 package main
 
 import (
-	"evoGo/config"
-	"evoGo/interfaces"
+	"github.com/svarin92/evoGo/config"
+	"github.com/svarin92/evoGo/interfaces"
 )
 
 // Interfaces imported to ensure architectural consistency.

@@ -4,9 +4,9 @@
 package controller
 
 import (
-	"evoGo/config"
-	"evoGo/interfaces"
-	"evoGo/model"
+	"github.com/svarin92/evoGo/config"
+	"github.com/svarin92/evoGo/interfaces"
+	"github.com/svarin92/evoGo/model"
 )
 
 // Aliases for functional types.

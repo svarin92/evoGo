@@ -4,11 +4,12 @@
 package model
 
 import (
-	"evoGo/utils"
 	"fmt"
 	"log"
 	"maps"
 	"strings"
+
+    "github.com/svarin92/evoGo/utils"
 )
 
 /* IndividualState */

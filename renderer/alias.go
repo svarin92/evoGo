@@ -4,7 +4,7 @@
 package renderer
 
 import (
-	"evoGo/interfaces"
+	"github.com/svarin92/evoGo/interfaces"
 )
 
 // Aliases for functional types.

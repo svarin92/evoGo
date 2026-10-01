@@ -3,7 +3,7 @@
 // See the LICENSE file for details.
 package optimizations
 
-import "evoGo/model"
+import "github.com/svarin92/evoGo/model"
 
 type(
 	IRuleModel = model.IRuleModel

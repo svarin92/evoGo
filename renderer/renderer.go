@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"evoGo/utils"
+	"github.com/svarin92/evoGo/utils"
 )
 
 // Renderer handles the export and display of grammatical derivations. It 
