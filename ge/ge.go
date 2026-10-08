@@ -73,11 +73,15 @@ func SearchLoop(
 	grammar IGrammar,
 	target any,
 	replacementFunc ReplacementFunc,
-	  // func([]IIndividual, []IIndividual, int) []IIndividual,
+	  // func([]IIndividual, []IIndividual, int) []IIndividual
 	selectionFunc  SelectionFunc,
-	  // func([]IIndividual, int) []IIndividual,
+	  // func([]IIndividual, int) []IIndividual
 	fitnessFunction FitnessFunc,
+	opts ...SearchOption,
+	  // Variadic parameter, optional
 ) (IIndividual, error) {
+	cfg := new(SearchConfig)
+    for _, opt := range opts { opt(cfg) }
 
 	// Create a template function.
     templateFunc := evaluator.NewTemplate(target)
@@ -88,6 +92,12 @@ func SearchLoop(
     if err != nil {
         return nil, fmt.Errorf("failed to create population: %w", err)
     }
+
+	// Injection immediately after creation: the hook is in place
+	// BEFORE the first tick of the tissue.
+    if cfg.hook != nil {
+        population.SetHybridizationHook(cfg.hook)
+    }	
 
 	// Create a Renderer for the rendering functions.
     renderer := renderer.NewRenderer(population.genomizer)	
