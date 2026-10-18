@@ -39,7 +39,7 @@ type IGenomizer interface {
 	GetUsedWraps() int
 	FindSimilarProductions(production []IRuleModel, averageFitness float64) [][]IRuleModel
 	NotifyGenerationStart(gen int, population []IIndividual)
-	NotifyGenerationEnd(gen int, bestEver IIndividual)
+	NotifyGenerationEnd(gen int, population []IIndividual)
 	ProductionSimilarity(p1, p2 []IRuleModel) float64
 	RepairIndividual(ind IIndividual) error
 	SetHybridizationHook(hook IHybridizationHook)
