@@ -153,6 +153,24 @@ func (ind *Individual) Copy() IIndividual {
 	return newInd
 }
 
+// Deposit implements the GenomeCarrier interface — an atomic repository 
+// of codons.
+func (i *Individual) Deposit(anchor int, codons []int) error {
+
+    if len(codons) == 0 {
+        return ErrEmptyDeposit
+    }
+
+    if anchor < 0 || anchor+len(codons) > len(i.genome) {
+        return ErrAnchorOutOfRange
+    }
+
+    // Defensive copy: the provided codons belong to the caller.
+    copy(i.genome[anchor:], codons)
+
+    return nil
+}
+
 // Evaluate assesses the individual's phenotype and updates their fitness.
 func (ind *Individual) Evaluate(fitness FitnessFunc) error {
 	ind.fitness = fitness(ind)

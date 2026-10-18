@@ -58,3 +58,8 @@ const (
 	LeftDerivation  	  = interfaces.LeftDerivation
 	HomogeneousDerivation = interfaces.HomogeneousDerivation
 )
+
+var (
+	ErrEmptyDeposit        = interfaces.ErrEmptyDeposit
+	ErrAnchorOutOfRange    = interfaces.ErrAnchorOutOfRange
+)
