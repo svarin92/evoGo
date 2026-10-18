@@ -5859,10 +5859,10 @@ func (g *Genomizer) NotifyGenerationStart(gen int, population []IIndividual) {
 }
 
 // NotifyGenerationEnd forwards the post-evaluation event, if any.
-func (g *Genomizer) NotifyGenerationEnd(gen int, bestEver IIndividual) {
+func (g *Genomizer) NotifyGenerationEnd(gen int, population []IIndividual) {
 
     if g.hook != nil {
-        g.hook.OnGenerationEnd(gen, bestEver)
+        g.hook.OnGenerationEnd(gen, population)
     }
 
 }

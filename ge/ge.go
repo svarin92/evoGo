@@ -161,7 +161,7 @@ func SearchLoop(
 
 		// AFTER the evaluation, the module collects (HarvestByOrgan on the
 		// evoCell side) the generation results, including bestEver.
-		population.genomizer.NotifyGenerationEnd(generation, bestEver)
+		population.genomizer.NotifyGenerationEnd(generation, population.individuals)
 
 		renderer.PrintStats(population, generation, GENERATION_SIZE)
 	}
